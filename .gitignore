@@ -1,0 +1,74 @@
+# MojoGUI Project - Git Ignore
+
+# Compiled binaries and libraries
+*.so
+*.o
+*.a
+*.dylib
+*.dll
+
+# Build directories
+build/
+dist/
+*.egg-info/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Mojo cache and temporary files
+*.mojo.cache
+.mojo/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# System files
+.DS_Store
+Thumbs.db
+*.log
+
+# Temporary and backup files
+*.tmp
+*.bak
+*.backup
+*~
+
+# Test output and debugging
+test_output/
+debug_logs/
+screenshots/
+*.debug
+
+# Google Drive upload folder (already created)
+google_drive_upload/
+MojoGUI_Complete_Project.zip
+
+# Executables created during testing
+test_simple
+test_int
+test_primitives
+demo_enhanced
+demo_fixed
+enhanced_widgets_demo
+simple_test
+simple_color_test
+window_test
+wininit_test
+testgui
+c_library_test
+direct_opengl_test
+quick_function_test
+test_string_formatting
+test_strings_fixed
+
+# Keep important demo applications
+!adaptive_file_manager.mojo
+!system_colors_demo.mojo
+!mojo-gui/
