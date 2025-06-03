@@ -1,0 +1,40 @@
+[project]
+name = "mojogui"
+version = "0.24.0001-alpha"
+description = "Experimental Mojo GUI Framework with Professional Font Rendering (Alpha)"
+authors = ["Alex <alex@example.com>"]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+# Note: OpenGL/GLFW dependencies require system installation
+# Run: sudo apt-get install build-essential pkg-config libglfw3-dev libgl1-mesa-dev
+
+[tasks]
+# Install system dependencies (Ubuntu/Debian)
+install-system-deps = """
+sudo apt-get update && \
+sudo apt-get install -y build-essential pkg-config libglfw3-dev libgl1-mesa-dev
+"""
+
+# Build the professional glyph atlas font library
+build = """
+cd mojo-gui/c_src && \
+gcc -Wall -Wextra -fPIC -O2 -std=c99 -c rendering_with_fonts.c -o rendering_with_fonts.o && \
+gcc -shared -o librendering_with_fonts.so rendering_with_fonts.o -lglfw -lGL -lm && \
+cp librendering_with_fonts.so ../.. && \
+echo "✅ Professional glyph atlas library built successfully"
+"""
+
+# Test the professional glyph atlas system (requires mojo to be installed separately)
+test-font = "mojo jetbrains_final_working.mojo || echo '❌ Mojo not found. Install Mojo from https://www.modular.com/mojo first'"
+
+# Clean all build artifacts
+clean = "rm -f *.o *.so mojo-gui/c_src/*.o mojo-gui/c_src/*.so"
+
+# Full development workflow
+dev-cycle = """
+pixi run clean && \
+pixi run build && \
+pixi run test-font
+"""

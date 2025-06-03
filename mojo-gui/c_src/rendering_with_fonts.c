@@ -26,11 +26,18 @@ static int g_mouse_buttons[8] = {0};
 static int g_keys[512] = {0};
 static int g_should_close = 0;
 
-// REAL font rendering with stb_truetype
+// PROFESSIONAL FONT RENDERING with glyph atlas
 static stbtt_fontinfo g_font;
 static unsigned char* g_font_buffer = NULL;
 static int g_font_loaded = 0;
 static float g_font_scale = 1.0f;
+
+// Glyph atlas system for smooth, efficient text rendering
+static GLuint g_font_texture = 0;
+static stbtt_bakedchar g_baked_chars[96]; // ASCII 32-127
+static int g_atlas_width = 512;
+static int g_atlas_height = 512;
+static float g_font_size = 48.0f; // High resolution for scaling
 
 // Embedded font data (minimal bitmap font)
 static unsigned char g_embedded_font[] = {
@@ -124,39 +131,15 @@ int initialize_gl_context(int width, int height, const char* title) {
 int load_default_font(void) {
     printf("🔤 Loading PROFESSIONAL fonts with stb_truetype...\n");
     
-    // Try to load MODERN UI FONTS (best to worst)
+    // JETBRAINS MONO ONLY - No fallbacks!
     const char* font_paths[] = {
-        // TIER 1: Modern UI Fonts (2020s standard)
-        "/usr/share/fonts/truetype/inter/Inter-Regular.ttf",
-        "/usr/share/fonts/truetype/roboto/Roboto-Regular.ttf",
-        "/usr/share/fonts/opentype/source-sans-pro/SourceSansPro-Regular.otf",
-        "/usr/share/fonts/truetype/source-sans-pro/SourceSansPro-Regular.ttf",
-        "/Windows/Fonts/segoeui.ttf",                    // Windows 10/11 UI font
-        "/System/Library/Fonts/SF-Pro-Display-Regular.otf", // macOS Big Sur+ UI font
-        "/System/Library/Fonts/SF-Pro-Text-Regular.otf",    // macOS system font
-        
-        // TIER 2: High-Quality Professional Fonts
-        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-        "/usr/share/fonts/opentype/noto/NotoSans-Regular.ttf",
-        "/usr/share/fonts/truetype/ubuntu/Ubuntu-Regular.ttf",
-        "/System/Library/Fonts/Helvetica.ttc",
-        "/Windows/Fonts/calibri.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-        
-        // Programming/Monospace fonts (great for IDEs)
-        "/usr/share/fonts/truetype/ubuntu/UbuntuMono-Regular.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-        "/System/Library/Fonts/Monaco.ttf", 
-        "/System/Library/Fonts/Menlo.ttc",
-        "/Windows/Fonts/consola.ttf",
-        
-        // High-quality fallbacks
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/TTF/DejaVuSans.ttf", 
-        "/System/Library/Fonts/Arial.ttf",
-        "/Windows/Fonts/arial.ttf",
-        "/usr/share/fonts/TTF/arial.ttf",
+        // ONLY JetBrains Mono paths (multiple locations for robustness)
+        "/home/alex/.local/share/fonts/jetbrains/JetBrainsMono-Regular.ttf",
+        "/home/alex/.local/share/fonts/jetbrains/JetBrainsMono-Bold.ttf",
+        "/home/alex/.local/share/fonts/JetBrainsMono-Regular.ttf",
+        "/usr/share/fonts/truetype/jetbrains/JetBrainsMono-Regular.ttf",
+        "/usr/local/share/fonts/JetBrainsMono-Regular.ttf",
+        "/usr/share/fonts/JetBrainsMono-Regular.ttf",
         NULL
     };
     
@@ -186,14 +169,52 @@ int load_default_font(void) {
             }
             fclose(file);
             
-            // Initialize stb_truetype with MODERN UI QUALITY
+            // Initialize stb_truetype with PROFESSIONAL GLYPH ATLAS
             if (stbtt_InitFont(&g_font, g_font_buffer, stbtt_GetFontOffsetForIndex(g_font_buffer, 0))) {
-                g_font_loaded = 1;
-                g_font_scale = stbtt_ScaleForPixelHeight(&g_font, 16.0f);
-                printf("   ✅ MODERN UI FONT loaded successfully: %s\n", font_paths[i]);
-                printf("   ✨ Professional UI-grade rendering enabled\n");
-                printf("   📐 Optimized letter spacing and anti-aliasing\n");
-                return 0;
+                // Create high-resolution glyph atlas
+                unsigned char* atlas_bitmap = malloc(g_atlas_width * g_atlas_height);
+                if (!atlas_bitmap) {
+                    printf("   ❌ Failed to allocate atlas bitmap\n");
+                    free(g_font_buffer);
+                    g_font_buffer = NULL;
+                    continue;
+                }
+                
+                // Bake ASCII characters 32-127 into atlas at high resolution
+                int bake_result = stbtt_BakeFontBitmap(g_font_buffer, 0, g_font_size, 
+                                                      atlas_bitmap, g_atlas_width, g_atlas_height, 
+                                                      32, 96, g_baked_chars);
+                
+                if (bake_result > 0) {
+                    // Create OpenGL texture for the atlas
+                    glGenTextures(1, &g_font_texture);
+                    glBindTexture(GL_TEXTURE_2D, g_font_texture);
+                    
+                    // Upload atlas with proper filtering for smooth text
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, g_atlas_width, g_atlas_height, 
+                                0, GL_ALPHA, GL_UNSIGNED_BYTE, atlas_bitmap);
+                    
+                    // Enable linear filtering for smooth scaling
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                    
+                    glBindTexture(GL_TEXTURE_2D, 0);
+                    
+                    g_font_loaded = 1;
+                    printf("   ✅ Professional font loaded successfully: %s\n", font_paths[i]);
+                    printf("   🎨 High-resolution glyph atlas created (%dx%d)\n", g_atlas_width, g_atlas_height);
+                    printf("   📈 Smooth anti-aliasing enabled with linear filtering\n");
+                    
+                    free(atlas_bitmap);
+                    return 0;
+                } else {
+                    printf("   ❌ Failed to bake font atlas\n");
+                    free(atlas_bitmap);
+                    free(g_font_buffer);
+                    g_font_buffer = NULL;
+                }
             } else {
                 printf("   ❌ Failed to initialize font\n");
                 free(g_font_buffer);
@@ -207,12 +228,12 @@ int load_default_font(void) {
     return -1;
 }
 
-// REAL text rendering using stb_truetype
+// PROFESSIONAL TEXT RENDERING using pre-baked glyph atlas
 int draw_text(const char* text, float x, float y, float size) {
     if (!text || strlen(text) == 0) return -1;
     
-    if (!g_font_loaded) {
-        printf("🔤 Font not loaded, drawing text as rectangles: %s\n", text);
+    if (!g_font_loaded || g_font_texture == 0) {
+        printf("🔤 Font atlas not loaded, drawing text as rectangles: %s\n", text);
         // Fallback to rectangles
         float char_width = size * 0.6f;
         float char_spacing = char_width + 2.0f;
@@ -226,86 +247,69 @@ int draw_text(const char* text, float x, float y, float size) {
         return 0;
     }
     
-    printf("🔤 Rendering REAL text: '%s' at (%.1f, %.1f) size %.1f\n", text, x, y, size);
+    printf("🔤 Rendering SMOOTH atlas text: '%s' at (%.1f, %.1f) size %.1f\n", text, x, y, size);
     
-    // Calculate scale for requested size with MODERN UI QUALITY
-    // Optimized for crisp UI rendering like VS Code, Figma, etc.
-    float scale = stbtt_ScaleForPixelHeight(&g_font, size * 1.15f);
+    // Calculate scale factor from atlas size to requested size
+    float scale = size / g_font_size;
     
-    int ascent, descent, line_gap;
-    stbtt_GetFontVMetrics(&g_font, &ascent, &descent, &line_gap);
+    // Enable professional text rendering
+    glEnable(GL_TEXTURE_2D);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    float baseline = y + ascent * scale;
-    float current_x = x;
+    // Bind the pre-baked glyph atlas
+    glBindTexture(GL_TEXTURE_2D, g_font_texture);
     
-    // Render each character
+    float current_x = 0.0f; // Start at 0 for GetBakedQuad
+    float current_y = 0.0f;
+    
+    // Render each character using the atlas
     for (const char* p = text; *p; p++) {
-        int codepoint = *p;
+        int c = (int)*p;
         
-        // Get character metrics
-        int advance_width, left_bearing;
-        stbtt_GetCodepointHMetrics(&g_font, codepoint, &advance_width, &left_bearing);
-        
-        // Get bounding box
-        int x0, y0, x1, y1;
-        stbtt_GetCodepointBitmapBox(&g_font, codepoint, scale, scale, &x0, &y0, &x1, &y1);
-        
-        // Create bitmap for this character
-        int bitmap_width = x1 - x0;
-        int bitmap_height = y1 - y0;
-        
-        if (bitmap_width > 0 && bitmap_height > 0) {
-            unsigned char* bitmap = stbtt_GetCodepointBitmap(&g_font, 0, scale, codepoint, &bitmap_width, &bitmap_height, 0, 0);
+        // Only render printable ASCII characters
+        if (c >= 32 && c < 128) {
+            int char_index = c - 32;
             
-            if (bitmap) {
-                // Render bitmap with PROFESSIONAL QUALITY ANTI-ALIASING
-                float char_x = current_x + left_bearing * scale;
-                float char_y = baseline + y0;
-                
-                // Enable smooth blending for professional text rendering
-                glEnable(GL_BLEND);
-                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                
-                glBegin(GL_QUADS);
-                for (int by = 0; by < bitmap_height; by++) {
-                    for (int bx = 0; bx < bitmap_width; bx++) {
-                        unsigned char alpha = bitmap[by * bitmap_width + bx];
-                        
-                        // MODERN UI: Professional anti-aliasing like VS Code/Figma
-                        if (alpha > 8) {  // Even lower threshold for maximum coverage
-                            float px = char_x + bx;
-                            float py = char_y + by;
-                            
-                            // Apply gamma-corrected alpha blending for crisp text
-                            float alpha_f = (float)alpha / 255.0f;
-                            alpha_f = alpha_f * alpha_f; // Gamma correction for better contrast
-                            glColor4f(1.0f, 1.0f, 1.0f, alpha_f);
-                            
-                            glVertex2f(px, py);
-                            glVertex2f(px + 1, py);
-                            glVertex2f(px + 1, py + 1);
-                            glVertex2f(px, py + 1);
-                        }
-                    }
-                }
-                glEnd();
-                
-                // Reset to default color
-                glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-                
-                stbtt_FreeBitmap(bitmap, NULL);
-            }
+            // Get pre-baked quad data with subpixel positioning
+            stbtt_aligned_quad quad;
+            stbtt_GetBakedQuad(g_baked_chars, g_atlas_width, g_atlas_height, 
+                              char_index, &current_x, &current_y, &quad, 1);
+            
+            // Scale and position the quad
+            float x0 = x + quad.x0 * scale;
+            float y0 = y + quad.y0 * scale;
+            float x1 = x + quad.x1 * scale;
+            float y1 = y + quad.y1 * scale;
+            
+            // Render smooth textured quad from atlas
+            glBegin(GL_QUADS);
+                glTexCoord2f(quad.s0, quad.t0); glVertex2f(x0, y0);
+                glTexCoord2f(quad.s1, quad.t0); glVertex2f(x1, y0);
+                glTexCoord2f(quad.s1, quad.t1); glVertex2f(x1, y1);
+                glTexCoord2f(quad.s0, quad.t1); glVertex2f(x0, y1);
+            glEnd();
+        } else {
+            // For non-printable characters, advance by average character width
+            current_x += g_font_size * 0.5f;
         }
-        
-        // Add optimized letter spacing for modern UI readability
-        current_x += (advance_width * scale) + 0.5f; // Slight letter spacing like modern UIs
     }
+    
+    // Cleanup
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glDisable(GL_TEXTURE_2D);
     
     return 0;
 }
 
-// Rest of the functions remain the same as original library
+// Cleanup function with proper atlas texture cleanup
 int cleanup_gl(void) {
+    // Clean up font atlas texture
+    if (g_font_texture != 0) {
+        glDeleteTextures(1, &g_font_texture);
+        g_font_texture = 0;
+    }
+    
     if (g_font_buffer) {
         free(g_font_buffer);
         g_font_buffer = NULL;

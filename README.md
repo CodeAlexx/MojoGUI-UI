@@ -1,35 +1,37 @@
-# 🗂️ MojoGUI - Professional GUI Framework for Mojo
+# 🗂️ MojoGUI - Experimental GUI Framework for Mojo
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-blue.svg)](https://github.com/your-username/mojogui)
-[![Status](https://img.shields.io/badge/Status-Production%20Ready-green.svg)](https://github.com/your-username/mojogui)
+[![Status](https://img.shields.io/badge/Status-Alpha%20v0.24.0001-orange.svg)](https://github.com/your-username/mojogui)
 
-A complete, professional GUI framework for the [Mojo programming language](https://www.modular.com/mojo) featuring modern UI components, system color integration, and real-time text input capabilities.
+⚠️ **EXPERIMENTAL ALPHA SOFTWARE** - Not suitable for production use.
+
+An experimental GUI framework for the [Mojo programming language](https://www.modular.com/mojo) featuring professional font rendering and basic UI components. This is a proof-of-concept demonstrating advanced text rendering with JetBrains Mono font integration.
 
 ## 🚀 **Key Features**
 
-### ✅ **Working Text Input System**
-- **Real-time character input** with professional text rendering
-- **Visual focus management** with system accent colors
-- **Backspace support** and cursor management
-- **Click-to-focus/unfocus** behavior
+### 🧪 **Experimental Text Rendering**
+- **Professional glyph atlas system** using stb_truetype
+- **JetBrains Mono font integration** (when available)
+- **Smooth anti-aliased text** (proof-of-concept)
+- **High-resolution font baking** (512x512 atlas)
 
-### ✅ **Professional File Manager**
-- **Dual-pane file browser** with adaptive system colors
-- **Interactive search functionality** with working text input
-- **Real-time mouse interaction** and hover effects
-- **System color integration** (automatic dark/light mode)
+### 🧪 **Experimental File Manager Demo**
+- **Basic dual-pane file browser** (prototype)
+- **Simple search functionality** (demonstration only)
+- **Mouse interaction** (limited implementation)
+- **System color detection** (proof-of-concept)
 
-### ✅ **Modern UI Components**
-- Professional TTF font rendering via `stb_truetype`
-- Cross-platform system color detection
-- Adaptive color schemes
-- Real-time visual feedback
+### 🧪 **Experimental Components**
+- **Font rendering**: TTF support via `stb_truetype` (alpha quality)
+- **System colors**: Basic detection (proof-of-concept)
+- **Widget prototypes**: Individual components (not integrated)
+- **Demo applications**: Show technical concepts only
 
-### ✅ **Cross-Platform Support**
-- **Linux**: Full support with GNOME/GTK integration
-- **macOS**: Native color scheme detection
-- **Windows**: System integration ready
+### 🧪 **Platform Support**
+- **Linux**: Primary development platform
+- **macOS**: Basic compatibility (untested)
+- **Windows**: Theoretical support (unverified)
 
 ## 📸 **Screenshots**
 
@@ -41,37 +43,48 @@ A complete, professional GUI framework for the [Mojo programming language](https
 ![System Colors](docs/system_colors_demo.png)
 *Automatic adaptation to system dark/light mode and accent colors*
 
-## 🔧 **Quick Start**
+## ⚠️ **ALPHA SOFTWARE WARNING**
+
+This is **EXPERIMENTAL ALPHA SOFTWARE v0.24.0001**:
+- **NOT suitable for production use**
+- **Frequent breaking changes expected**
+- **Limited documentation and support**
+- **Use for research/experimentation only**
+
+## 🔧 **Quick Start (For Developers/Researchers)**
 
 ### **Prerequisites**
-- [Mojo programming language](https://www.modular.com/mojo)
+- [Mojo programming language](https://www.modular.com/mojo) (required)
+- [Pixi package manager](https://pixi.sh) (recommended) 
 - OpenGL and GLFW development libraries
 - GCC or compatible C compiler
 
 ### **Installation**
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/your-username/mojogui.git
-   cd mojogui
-   ```
+#### **Option 1: Using Pixi (Recommended)**
+```bash
+git clone https://github.com/your-username/mojogui.git
+cd mojogui
+pixi install
+pixi run build
+pixi run test-font  # Requires mojo in PATH
+```
 
-2. **Build the C libraries**
-   ```bash
-   cd mojo-gui/c_src
-   make
-   ```
-
-3. **Run the file manager demo**
-   ```bash
-   cd ../..
-   mojo adaptive_file_manager.mojo
-   ```
-
-4. **Test the search functionality**
-   - Click the search box (top-right corner)
-   - Start typing - text appears immediately!
-   - Use backspace to edit
+#### **Option 2: Manual Build**
+```bash
+git clone https://github.com/your-username/mojogui.git
+cd mojogui
+# Install system dependencies
+sudo apt-get install build-essential pkg-config libglfw3-dev libgl1-mesa-dev
+# Build the font library
+cd mojo-gui/c_src
+gcc -Wall -Wextra -fPIC -O2 -std=c99 -c rendering_with_fonts.c -o rendering_with_fonts.o
+gcc -shared -o librendering_with_fonts.so rendering_with_fonts.o -lglfw -lGL -lm
+cp librendering_with_fonts.so ../..
+cd ../..
+# Test the professional font rendering
+mojo jetbrains_final_working.mojo
+```
 
 ## 🎯 **Main Applications**
 
@@ -340,19 +353,25 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **🎨 4,000+ lines** - Real widget implementation code
 - **⚡ Active development** - Working components with integration in progress
 
-## 🚧 **Status: Active Development**
+## 🚧 **Status: EXPERIMENTAL ALPHA v0.24.0001**
 
-This is a **substantial GUI framework** with working components:
-- ✅ **Real text input functionality** - 500+ lines of working input handling
-- ✅ **File manager prototype** - Demonstrates integration potential
-- ✅ **System color integration** - Cross-platform dark/light mode detection
-- ✅ **30+ widget implementations** - Individual components working
-- ✅ **4,000+ lines of widget code** - Substantial implementation, not stubs
-- ✅ **Cross-platform compatibility** - Linux, macOS, Windows ready
-- ✅ **Comprehensive documentation** - With real code examples
+⚠️ **This is experimental alpha software - NOT production ready!**
 
-**Working components available for experimentation and development!**
-*Integration between widgets needs refinement for production use.*
+**What works:**
+- ✅ **Professional glyph atlas text rendering** - Smooth JetBrains Mono fonts
+- ✅ **Basic proof-of-concept demos** - Shows technical feasibility
+- ✅ **Individual widget prototypes** - Demonstrates concepts
+- ✅ **System integration examples** - Cross-platform color detection
+
+**Major limitations:**
+- ❌ **No production-ready architecture** - Needs complete redesign
+- ❌ **Missing error handling** - Minimal robustness
+- ❌ **No memory management** - Potential leaks
+- ❌ **Limited testing** - Proof-of-concept quality only
+- ❌ **No documentation for production** - Demo code only
+
+**Suitable for: Research, experimentation, learning**
+**NOT suitable for: Production applications, commercial use**
 
 ---
 
