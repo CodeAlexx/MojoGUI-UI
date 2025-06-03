@@ -5,6 +5,7 @@ Scrollbar widget for scrolling content using integer coordinates.
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
+from ..theme_state_integration import get_theme
 
 # ScrollBar parts
 alias SCROLLBAR_TRACK = 0
@@ -66,14 +67,15 @@ struct ScrollBarInt(BaseWidgetInt):
         self.is_visible = True
         
         # Set colors
-        self.track_color = ColorInt(60, 60, 60, 255)
-        self.thumb_color = ColorInt(100, 100, 100, 255)
-        self.thumb_hover_color = ColorInt(120, 120, 120, 255)
-        self.thumb_pressed_color = ColorInt(140, 140, 140, 255)
-        self.button_color = ColorInt(80, 80, 80, 255)
-        self.button_hover_color = ColorInt(100, 100, 100, 255)
-        self.button_pressed_color = ColorInt(120, 120, 120, 255)
-        self.arrow_color = ColorInt(200, 200, 200, 255)
+        let theme = get_theme()
+        self.track_color = theme.widget_background
+        self.thumb_color = theme.secondary_border
+        self.thumb_hover_color = theme.primary_border
+        self.thumb_pressed_color = theme.accent_primary
+        self.button_color = theme.widget_background
+        self.button_hover_color = theme.selection_hover
+        self.button_pressed_color = theme.selection_background
+        self.arrow_color = theme.primary_text
         
         # Override base appearance
         self.background_color = self.track_color

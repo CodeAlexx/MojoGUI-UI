@@ -5,6 +5,7 @@ Interactive button widget using only integer coordinates and colors.
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
+from ..theme_system import get_theme
 
 # Button states
 alias BUTTON_NORMAL = 0
@@ -29,18 +30,20 @@ struct ButtonInt(BaseWidgetInt):
         """Initialize button."""
         self.super().__init__(x, y, width, height)
         self.text = text
-        self.text_color = ColorInt(0, 0, 0, 255)  # Black text
-        self.hover_color = ColorInt(200, 200, 255, 255)  # Light blue
-        self.pressed_color = ColorInt(150, 150, 230, 255)  # Darker blue
-        self.disabled_color = ColorInt(180, 180, 180, 255)  # Gray
+        # Set colors using theme system
+        let theme = get_theme()
+        self.text_color = theme.primary_text
+        self.hover_color = theme.button_hover
+        self.pressed_color = theme.button_pressed
+        self.disabled_color = theme.button_disabled
         self.font_size = 14
         self.state = BUTTON_NORMAL
         self.was_pressed = False
         self.click_count = 0
         
-        # Set default button appearance
-        self.background_color = ColorInt(230, 230, 230, 255)  # Light gray
-        self.border_color = ColorInt(128, 128, 128, 255)      # Gray border
+        # Set default button appearance using theme
+        self.background_color = theme.button_normal
+        self.border_color = theme.primary_border
         self.border_width = 2
     
     fn set_text(inout self, text: String):
@@ -168,31 +171,34 @@ fn create_button_int(x: Int32, y: Int32, width: Int32, height: Int32, text: Stri
     return ButtonInt(x, y, width, height, text)
 
 fn create_primary_button_int(x: Int32, y: Int32, width: Int32, height: Int32, text: String) -> ButtonInt:
-    """Create a primary (blue) button."""
+    """Create a primary button using theme colors."""
     var button = ButtonInt(x, y, width, height, text)
-    button.background_color = ColorInt(50, 100, 230, 255)  # Blue
-    button.hover_color = ColorInt(80, 130, 255, 255)       # Lighter blue
-    button.pressed_color = ColorInt(30, 80, 200, 255)      # Darker blue
-    button.text_color = ColorInt(255, 255, 255, 255)       # White text
-    button.border_color = ColorInt(30, 60, 150, 255)       # Dark blue border
+    let theme = get_theme()
+    button.background_color = theme.button_primary
+    button.hover_color = theme.button_primary_hover
+    button.pressed_color = theme.button_primary_pressed
+    button.text_color = theme.button_primary_text
+    button.border_color = theme.button_primary_border
     return button
 
 fn create_success_button_int(x: Int32, y: Int32, width: Int32, height: Int32, text: String) -> ButtonInt:
-    """Create a success (green) button."""
+    """Create a success button using theme colors."""
     var button = ButtonInt(x, y, width, height, text)
-    button.background_color = ColorInt(50, 200, 80, 255)   # Green
-    button.hover_color = ColorInt(80, 230, 100, 255)       # Lighter green
-    button.pressed_color = ColorInt(30, 180, 60, 255)      # Darker green
-    button.text_color = ColorInt(255, 255, 255, 255)       # White text
-    button.border_color = ColorInt(30, 130, 50, 255)       # Dark green border
+    let theme = get_theme()
+    button.background_color = theme.button_success
+    button.hover_color = theme.button_success_hover
+    button.pressed_color = theme.button_success_pressed
+    button.text_color = theme.button_success_text
+    button.border_color = theme.button_success_border
     return button
 
 fn create_danger_button_int(x: Int32, y: Int32, width: Int32, height: Int32, text: String) -> ButtonInt:
-    """Create a danger (red) button."""
+    """Create a danger button using theme colors."""
     var button = ButtonInt(x, y, width, height, text)
-    button.background_color = ColorInt(230, 50, 50, 255)   # Red
-    button.hover_color = ColorInt(255, 80, 80, 255)        # Lighter red
-    button.pressed_color = ColorInt(200, 30, 30, 255)      # Darker red
-    button.text_color = ColorInt(255, 255, 255, 255)       # White text
-    button.border_color = ColorInt(150, 30, 30, 255)       # Dark red border
+    let theme = get_theme()
+    button.background_color = theme.button_danger
+    button.hover_color = theme.button_danger_hover
+    button.pressed_color = theme.button_danger_pressed
+    button.text_color = theme.button_danger_text
+    button.border_color = theme.button_danger_border
     return button

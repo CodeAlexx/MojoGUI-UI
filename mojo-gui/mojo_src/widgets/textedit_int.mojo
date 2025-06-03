@@ -5,6 +5,7 @@ Interactive text input field using integer coordinates.
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
+from ..theme_state_integration import get_theme
 
 struct TextEditInt(BaseWidgetInt):
     """Interactive text input widget using integer coordinates."""
@@ -30,10 +31,11 @@ struct TextEditInt(BaseWidgetInt):
         self.super().__init__(x, y, width, height)
         self.text = ""
         self.placeholder = placeholder
-        self.text_color = ColorInt(0, 0, 0, 255)           # Black text
-        self.placeholder_color = ColorInt(128, 128, 128, 255)  # Gray placeholder
-        self.selection_color = ColorInt(100, 150, 255, 128)    # Blue selection
-        self.cursor_color = ColorInt(0, 0, 0, 255)         # Black cursor
+        let theme = get_theme()
+        self.text_color = theme.primary_text
+        self.placeholder_color = theme.secondary_text
+        self.selection_color = theme.selection_background
+        self.cursor_color = theme.primary_text
         self.font_size = 14
         self.cursor_position = 0
         self.selection_start = -1
@@ -45,8 +47,8 @@ struct TextEditInt(BaseWidgetInt):
         self.padding = 4
         
         # Set text field appearance
-        self.background_color = ColorInt(255, 255, 255, 255)  # White background
-        self.border_color = ColorInt(128, 128, 128, 255)      # Gray border
+        self.background_color = theme.text_field_background
+        self.border_color = theme.primary_border
         self.border_width = 2
     
     fn get_text(self) -> String:
@@ -264,7 +266,8 @@ struct TextEditInt(BaseWidgetInt):
         
         # Update focus appearance
         if self.is_focused:
-            _ = ctx.set_color(100, 150, 255, 255)  # Blue focus border
+            let theme = get_theme()
+            _ = ctx.set_color(theme.accent_primary.r, theme.accent_primary.g, theme.accent_primary.b, theme.accent_primary.a)
             _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y, self.bounds.width, self.bounds.height)
         
         let text_rect = self.get_text_rect()

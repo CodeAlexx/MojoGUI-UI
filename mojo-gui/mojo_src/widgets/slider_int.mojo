@@ -5,6 +5,7 @@ Interactive slider for numeric value selection using integer coordinates.
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
+from ..theme_state_integration import get_theme
 
 struct SliderInt(BaseWidgetInt):
     """Interactive slider widget using integer coordinates."""
@@ -35,9 +36,10 @@ struct SliderInt(BaseWidgetInt):
         elif self.current_value > self.max_value:
             self.current_value = self.max_value
         
-        self.track_color = ColorInt(200, 200, 200, 255)  # Light gray track
-        self.thumb_color = ColorInt(100, 150, 255, 255)  # Blue thumb
-        self.thumb_hover_color = ColorInt(120, 170, 255, 255)  # Lighter blue on hover
+        let theme = get_theme()
+        self.track_color = theme.widget_background
+        self.thumb_color = theme.accent_primary
+        self.thumb_hover_color = theme.accent_hover
         self.thumb_size = 20
         self.track_height = 6
         self.is_dragging = False
@@ -47,8 +49,8 @@ struct SliderInt(BaseWidgetInt):
         self.orientation = 0 if width > height else 1  # 0 = horizontal, 1 = vertical
         
         # Set default appearance
-        self.background_color = ColorInt(240, 240, 240, 255)  # Light background
-        self.border_color = ColorInt(180, 180, 180, 255)      # Light gray border
+        self.background_color = theme.widget_background
+        self.border_color = theme.secondary_border
         self.border_width = 1
     
     fn get_value(self) -> Int32:
@@ -206,7 +208,8 @@ struct SliderInt(BaseWidgetInt):
         _ = ctx.draw_filled_rectangle(track.x, track.y, track.width, track.height)
         
         # Draw track border
-        _ = ctx.set_color(150, 150, 150, 255)
+        let theme = get_theme()
+        _ = ctx.set_color(theme.primary_border.r, theme.primary_border.g, theme.primary_border.b, theme.primary_border.a)
         _ = ctx.draw_rectangle(track.x, track.y, track.width, track.height)
         
         # Draw thumb
@@ -220,7 +223,7 @@ struct SliderInt(BaseWidgetInt):
                                   self.thumb_size // 2, 16)
         
         # Draw thumb border
-        _ = ctx.set_color(80, 80, 80, 255)
+        _ = ctx.set_color(theme.primary_border.r, theme.primary_border.g, theme.primary_border.b, theme.primary_border.a)
         _ = ctx.draw_rectangle(thumb.x, thumb.y, thumb.width, thumb.height)
     
     fn update(inout self):

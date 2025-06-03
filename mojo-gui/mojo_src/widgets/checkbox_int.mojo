@@ -5,6 +5,7 @@ Interactive checkbox for boolean selections using integer coordinates.
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
+from ..theme_system import get_theme
 
 # Checkbox styles
 alias CHECKBOX_SQUARE = 0
@@ -38,10 +39,12 @@ struct CheckboxInt(BaseWidgetInt):
         """Initialize checkbox."""
         self.super().__init__(x, y, width, height)
         self.text = text
-        self.text_color = ColorInt(0, 0, 0, 255)  # Black text
-        self.check_color = ColorInt(255, 255, 255, 255)  # White checkmark for better visibility
-        self.check_background_color = ColorInt(50, 150, 50, 255)  # Green background when checked
-        self.hover_color = ColorInt(220, 220, 255, 255)  # Light blue hover
+        # Set colors using theme system
+        let theme = get_theme()
+        self.text_color = theme.primary_text
+        self.check_color = theme.checkbox_mark
+        self.check_background_color = theme.checkbox_checked_bg
+        self.hover_color = theme.checkbox_hover
         self.font_size = 14
         self.checked = False
         self.was_pressed = False
@@ -52,9 +55,9 @@ struct CheckboxInt(BaseWidgetInt):
         self.check_style = check_style
         self.use_check_background = True
         
-        # Set checkbox appearance
-        self.background_color = ColorInt(255, 255, 255, 255)  # White background
-        self.border_color = ColorInt(128, 128, 128, 255)      # Gray border
+        # Set checkbox appearance using theme
+        self.background_color = theme.checkbox_background
+        self.border_color = theme.primary_border
         self.border_width = 2
     
     fn set_text(inout self, text: String):
@@ -243,7 +246,8 @@ fn create_checkbox_int_with_mark(x: Int32, y: Int32, width: Int32, height: Int32
     let style = CHECKBOX_ROUND if round else CHECKBOX_SQUARE
     var checkbox = CheckboxInt(x, y, width, height, text, style, CHECK_MARK)
     checkbox.set_use_check_background(False)
-    checkbox.set_check_color(ColorInt(0, 150, 0, 255))  # Green check mark
+    let theme = get_theme()
+    checkbox.set_check_color(theme.checkbox_mark_color)
     return checkbox
 
 fn create_checkbox_int_checked(x: Int32, y: Int32, width: Int32, height: Int32, text: String, round: Bool = False) -> CheckboxInt:

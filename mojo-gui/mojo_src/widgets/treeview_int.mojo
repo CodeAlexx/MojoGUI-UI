@@ -7,6 +7,7 @@ from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, Re
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
 from .widget_constants import *
 from .scrollbar_int import ScrollBarInt
+from ..theme_system import get_theme
 
 # Tree node states
 alias NODE_COLLAPSED = 0
@@ -45,7 +46,8 @@ struct TreeNode:
         self.is_selected = False
         self.is_visible = True
         self.data = 0
-        self.icon_color = ColorInt(255, 255, 255, 255)
+        let theme = get_theme()
+        self.icon_color = theme.primary_text
     
     fn add_child(inout self, child_id: Int32):
         """Add a child node ID."""
@@ -140,13 +142,14 @@ struct TreeViewInt(BaseWidgetInt):
         self.content_height = 0
         self.max_width = 0
         
-        # Colors
-        self.text_color = ColorInt(0, 0, 0, 255)
-        self.selected_bg_color = ColorInt(51, 153, 255, 255)
-        self.selected_text_color = ColorInt(255, 255, 255, 255)
-        self.hover_bg_color = ColorInt(230, 240, 250, 255)
-        self.line_color = ColorInt(200, 200, 200, 255)
-        self.expand_icon_color = ColorInt(100, 100, 100, 255)
+        # Colors using theme system
+        let theme = get_theme()
+        self.text_color = theme.primary_text
+        self.selected_bg_color = theme.selection_bg
+        self.selected_text_color = theme.selection_text
+        self.hover_bg_color = theme.highlight_bg
+        self.line_color = theme.divider_color
+        self.expand_icon_color = theme.secondary_text
         
         # Interaction
         self.is_dragging = False
@@ -155,9 +158,9 @@ struct TreeViewInt(BaseWidgetInt):
         self.multi_select = False
         self.selected_nodes = List[Int32]()
         
-        # Set appearance
-        self.background_color = ColorInt(255, 255, 255, 255)
-        self.border_color = ColorInt(200, 200, 200, 255)
+        # Set appearance using theme
+        self.background_color = theme.primary_bg
+        self.border_color = theme.primary_border
         self.border_width = 1
     
     fn add_node(inout self, text: String, parent_id: Int32 = -1, 

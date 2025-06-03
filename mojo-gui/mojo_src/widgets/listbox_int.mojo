@@ -5,6 +5,7 @@ Scrollable list selection widget using integer coordinates.
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
+from ..theme_state_integration import get_theme
 
 struct ListItemInt:
     """Individual list item."""
@@ -43,18 +44,19 @@ struct ListBoxInt(BaseWidgetInt):
         self.item_height = 20
         self.visible_items = (height - 4) // self.item_height  # Account for borders
         
-        self.text_color = ColorInt(0, 0, 0, 255)           # Black text
-        self.selected_color = ColorInt(100, 150, 255, 255)  # Blue selection
-        self.selected_text_color = ColorInt(255, 255, 255, 255)  # White selected text
-        self.hover_color = ColorInt(200, 220, 255, 128)    # Light blue hover
+        let theme = get_theme()
+        self.text_color = theme.primary_text
+        self.selected_color = theme.selection_background
+        self.selected_text_color = theme.selection_text
+        self.hover_color = theme.selection_hover
         self.font_size = 12
         self.padding = 4
         self.hover_index = -1
         self.allow_multiple_selection = False
         
         # Set appearance
-        self.background_color = ColorInt(255, 255, 255, 255)  # White background
-        self.border_color = ColorInt(128, 128, 128, 255)      # Gray border
+        self.background_color = theme.widget_background
+        self.border_color = theme.primary_border
         self.border_width = 2
     
     fn add_item(inout self, text: String, data: Int32 = 0):
@@ -263,7 +265,8 @@ struct ListBoxInt(BaseWidgetInt):
         let content = self.get_content_rect()
         
         # Draw scrollbar track
-        _ = ctx.set_color(230, 230, 230, 255)
+        let theme = get_theme()
+        _ = ctx.set_color(theme.widget_background.r, theme.widget_background.g, theme.widget_background.b, theme.widget_background.a)
         _ = ctx.draw_filled_rectangle(scrollbar_x, content.y, scrollbar_width, content.height)
         
         # Calculate thumb size and position
@@ -272,11 +275,11 @@ struct ListBoxInt(BaseWidgetInt):
         let thumb_y = content.y + content.height * self.scroll_offset // total_items
         
         # Draw scrollbar thumb
-        _ = ctx.set_color(150, 150, 150, 255)
+        _ = ctx.set_color(theme.secondary_border.r, theme.secondary_border.g, theme.secondary_border.b, theme.secondary_border.a)
         _ = ctx.draw_filled_rectangle(scrollbar_x + 1, thumb_y, scrollbar_width - 2, thumb_height)
         
         # Draw scrollbar border
-        _ = ctx.set_color(128, 128, 128, 255)
+        _ = ctx.set_color(theme.primary_border.r, theme.primary_border.g, theme.primary_border.b, theme.primary_border.a)
         _ = ctx.draw_rectangle(scrollbar_x, content.y, scrollbar_width, content.height)
     
     fn update(inout self):

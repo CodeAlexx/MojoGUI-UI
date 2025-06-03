@@ -5,6 +5,7 @@ Text display widget using only integer coordinates and colors.
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
+from ..theme_system import get_theme
 
 # Text alignment options
 alias ALIGN_LEFT = 0
@@ -24,13 +25,15 @@ struct TextLabelInt(BaseWidgetInt):
         """Initialize text label."""
         self.super().__init__(x, y, width, height)
         self.text = text
-        self.text_color = ColorInt(0, 0, 0, 255)  # Black text
+        # Set colors using theme system
+        let theme = get_theme()
+        self.text_color = theme.primary_text
         self.font_size = 14
         self.alignment = ALIGN_LEFT
         self.padding = 4
         
         # Set transparent background by default
-        self.background_color = ColorInt(0, 0, 0, 0)
+        self.background_color = theme.transparent
         self.border_width = 0
     
     fn set_text(inout self, text: String):
@@ -111,12 +114,14 @@ fn create_title_label_int(x: Int32, y: Int32, width: Int32, height: Int32, text:
     var label = TextLabelInt(x, y, width, height, text)
     label.set_font_size(18)
     label.set_alignment(ALIGN_CENTER)
-    label.set_text_color(ColorInt(50, 50, 50, 255))  # Dark gray
+    let theme = get_theme()
+    label.set_text_color(theme.title_text)
     return label
 
 fn create_subtitle_label_int(x: Int32, y: Int32, width: Int32, height: Int32, text: String) -> TextLabelInt:
     """Create a subtitle label with medium font."""
     var label = TextLabelInt(x, y, width, height, text)
     label.set_font_size(16)
-    label.set_text_color(ColorInt(100, 100, 100, 255))  # Medium gray
+    let theme = get_theme()
+    label.set_text_color(theme.subtitle_text)
     return label

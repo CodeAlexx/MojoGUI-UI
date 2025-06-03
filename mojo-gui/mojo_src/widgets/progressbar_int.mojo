@@ -5,6 +5,7 @@ Progress indicator widget using integer coordinates.
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
+from ..theme_system import get_theme
 
 # Progress bar styles
 alias PROGRESS_HORIZONTAL = 0
@@ -36,9 +37,11 @@ struct ProgressBarInt(BaseWidgetInt):
         self.max_value = max_val
         self.current_value = min_val
         
-        self.progress_color = ColorInt(50, 150, 50, 255)   # Green progress
-        self.track_color = ColorInt(220, 220, 220, 255)    # Light gray track
-        self.text_color = ColorInt(0, 0, 0, 255)           # Black text
+        # Set colors using theme system
+        let theme = get_theme()
+        self.progress_color = theme.progress_fill
+        self.track_color = theme.progress_track
+        self.text_color = theme.primary_text
         
         # Determine orientation based on dimensions
         self.orientation = PROGRESS_HORIZONTAL if width > height else PROGRESS_VERTICAL
@@ -48,9 +51,9 @@ struct ProgressBarInt(BaseWidgetInt):
         self.font_size = 12
         self.animation_offset = 0
         
-        # Set appearance
-        self.background_color = ColorInt(240, 240, 240, 255)
-        self.border_color = ColorInt(180, 180, 180, 255)
+        # Set appearance using theme
+        self.background_color = theme.widget_background
+        self.border_color = theme.primary_border
         self.border_width = 1
     
     fn get_value(self) -> Int32:
@@ -82,16 +85,17 @@ struct ProgressBarInt(BaseWidgetInt):
     
     fn set_color_scheme(inout self, scheme: Int32):
         """Set predefined color scheme."""
-        if scheme == 0:  # Default (green)
-            self.progress_color = ColorInt(50, 150, 50, 255)
+        let theme = get_theme()
+        if scheme == 0:  # Default (success)
+            self.progress_color = theme.progress_fill
         elif scheme == 1:  # Info (blue)
-            self.progress_color = ColorInt(50, 100, 200, 255)
+            self.progress_color = theme.info_color
         elif scheme == 2:  # Warning (orange)
-            self.progress_color = ColorInt(255, 150, 50, 255)
+            self.progress_color = theme.warning_color
         elif scheme == 3:  # Danger (red)
-            self.progress_color = ColorInt(200, 50, 50, 255)
+            self.progress_color = theme.error_color
         elif scheme == 4:  # Success (bright green)
-            self.progress_color = ColorInt(40, 200, 40, 255)
+            self.progress_color = theme.success_color
     
     fn set_style(inout self, style: Int32):
         """Set progress bar style."""

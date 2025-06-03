@@ -5,6 +5,7 @@ Modal dialog window using integer coordinates.
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
+from ..theme_state_integration import get_theme
 
 # Dialog types
 alias DIALOG_INFO = 0
@@ -79,25 +80,26 @@ struct DialogInt(BaseWidgetInt):
         self.drag_offset = PointInt(0, 0)
         
         # Colors based on dialog type
-        self.title_color = ColorInt(255, 255, 255, 255)       # White title text
-        self.message_color = ColorInt(0, 0, 0, 255)           # Black message text
-        self.button_color = ColorInt(220, 220, 220, 255)      # Light gray buttons
-        self.button_hover_color = ColorInt(200, 220, 255, 255) # Light blue hover
-        self.button_text_color = ColorInt(0, 0, 0, 255)       # Black button text
-        self.overlay_color = ColorInt(0, 0, 0, 128)           # Semi-transparent overlay
-        self.shadow_color = ColorInt(0, 0, 0, 64)             # Shadow
+        let theme = get_theme()
+        self.title_color = theme.selection_text
+        self.message_color = theme.primary_text
+        self.button_color = theme.widget_background
+        self.button_hover_color = theme.selection_hover
+        self.button_text_color = theme.primary_text
+        self.overlay_color = ColorInt(0, 0, 0, 128)  # Keep semi-transparent overlay
+        self.shadow_color = ColorInt(0, 0, 0, 64)    # Keep shadow
         
-        # Set title background based on type
+        # Set title background based on type (use theme colors but adapt for semantic meaning)
         if dialog_type == DIALOG_INFO:
-            self.title_background = ColorInt(60, 120, 200, 255)  # Blue
+            self.title_background = theme.accent_primary
         elif dialog_type == DIALOG_WARNING:
-            self.title_background = ColorInt(255, 165, 0, 255)   # Orange
+            self.title_background = ColorInt(255, 165, 0, 255)   # Keep warning orange
         elif dialog_type == DIALOG_ERROR:
-            self.title_background = ColorInt(200, 60, 60, 255)   # Red
+            self.title_background = ColorInt(200, 60, 60, 255)   # Keep error red
         elif dialog_type == DIALOG_QUESTION:
-            self.title_background = ColorInt(100, 150, 100, 255) # Green
+            self.title_background = ColorInt(100, 150, 100, 255) # Keep question green
         else:
-            self.title_background = ColorInt(120, 120, 120, 255) # Gray
+            self.title_background = theme.secondary_border
         
         self.title_height = 30
         self.button_height = 35
@@ -108,8 +110,8 @@ struct DialogInt(BaseWidgetInt):
         self.hover_button = -1
         
         # Set appearance
-        self.background_color = ColorInt(240, 240, 240, 255)  # Light gray dialog
-        self.border_color = ColorInt(100, 100, 100, 255)      # Dark gray border
+        self.background_color = theme.widget_background
+        self.border_color = theme.primary_border
         self.border_width = 2
     
     fn add_button(inout self, text: String, button_type: Int32):
@@ -322,7 +324,8 @@ struct DialogInt(BaseWidgetInt):
         _ = ctx.draw_rectangle(button.rect.x, button.rect.y, button.rect.width, button.rect.height)
         
         # Draw button text
-        let text_color = self.button_text_color if button.enabled else ColorInt(128, 128, 128, 255)
+        let theme = get_theme()
+        let text_color = self.button_text_color if button.enabled else theme.secondary_text
         _ = ctx.set_color(text_color.r, text_color.g, text_color.b, text_color.a)
         
         let text_x = button.rect.x + (button.rect.width - len(button.text) * 6) // 2

@@ -5,6 +5,7 @@ Advanced list widget with columns, sorting, and selection using integer coordina
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
+from ..theme_system import get_theme
 
 # ListView styles
 alias LISTVIEW_STYLE_LIST = 0
@@ -129,19 +130,20 @@ struct ListViewInt(BaseWidgetInt):
         let content_height = height - (self.header_height if self.show_header else 0)
         self.visible_item_count = content_height // self.item_height
         
-        # Set colors
-        self.item_color = ColorInt(255, 255, 255, 255)       # White
-        self.alternate_color = ColorInt(248, 248, 248, 255)  # Very light gray
-        self.selected_color = ColorInt(51, 153, 255, 255)    # Blue
-        self.focused_color = ColorInt(173, 216, 230, 255)    # Light blue
-        self.header_color = ColorInt(240, 240, 240, 255)     # Light gray
-        self.grid_color = ColorInt(220, 220, 220, 255)       # Light gray
-        self.text_color = ColorInt(0, 0, 0, 255)             # Black
-        self.selected_text_color = ColorInt(255, 255, 255, 255)  # White
+        # Set colors using theme system
+        let theme = get_theme()
+        self.item_color = theme.primary_bg
+        self.alternate_color = theme.secondary_bg
+        self.selected_color = theme.selection_bg
+        self.focused_color = theme.highlight_bg
+        self.header_color = theme.tertiary_bg
+        self.grid_color = theme.divider_color
+        self.text_color = theme.primary_text
+        self.selected_text_color = theme.selection_text
         
-        # Set widget appearance
-        self.background_color = ColorInt(255, 255, 255, 255)
-        self.border_color = ColorInt(180, 180, 180, 255)
+        # Set widget appearance using theme
+        self.background_color = theme.surface_bg
+        self.border_color = theme.primary_border
         self.border_width = 1
         
         # Initialize scroll and interaction

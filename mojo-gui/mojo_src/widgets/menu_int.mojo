@@ -5,6 +5,7 @@ Menu bar and dropdown menu system using integer coordinates.
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
+from ..theme_state_integration import get_theme
 
 struct MenuItemInt:
     """Individual menu item."""
@@ -51,18 +52,19 @@ struct MenuBarInt(BaseWidgetInt):
         self.dropdown_visible = False
         self.dropdown_hover = -1
         
-        self.text_color = ColorInt(0, 0, 0, 255)           # Black text
-        self.hover_color = ColorInt(200, 220, 255, 255)    # Light blue hover
-        self.active_color = ColorInt(100, 150, 255, 255)   # Blue active
-        self.disabled_color = ColorInt(128, 128, 128, 255) # Gray disabled
+        let theme = get_theme()
+        self.text_color = theme.primary_text
+        self.hover_color = theme.selection_hover
+        self.active_color = theme.selection_background
+        self.disabled_color = theme.secondary_text
         self.font_size = 12
         self.padding = 8
         self.dropdown_width = 150
         self.dropdown_height = 25
         
         # Set appearance
-        self.background_color = ColorInt(240, 240, 240, 255)  # Light gray
-        self.border_color = ColorInt(180, 180, 180, 255)      # Gray border
+        self.background_color = theme.widget_background
+        self.border_color = theme.secondary_border
         self.border_width = 1
     
     fn add_menu(inout self, text: String, items: List[MenuItemInt]):
@@ -221,11 +223,12 @@ struct MenuBarInt(BaseWidgetInt):
         let dropdown_rect = self.get_dropdown_rect(menu_index)
         
         # Draw dropdown background
-        _ = ctx.set_color(255, 255, 255, 255)
+        let theme = get_theme()
+        _ = ctx.set_color(theme.widget_background.r, theme.widget_background.g, theme.widget_background.b, theme.widget_background.a)
         _ = ctx.draw_filled_rectangle(dropdown_rect.x, dropdown_rect.y, dropdown_rect.width, dropdown_rect.height)
         
         # Draw dropdown border
-        _ = ctx.set_color(128, 128, 128, 255)
+        _ = ctx.set_color(theme.primary_border.r, theme.primary_border.g, theme.primary_border.b, theme.primary_border.a)
         _ = ctx.draw_rectangle(dropdown_rect.x, dropdown_rect.y, dropdown_rect.width, dropdown_rect.height)
         
         # Draw dropdown items
