@@ -1,10 +1,38 @@
 # 🗂️ MojoGUI - Experimental GUI Framework for Mojo
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-blue.svg)](https://github.com/your-username/mojogui)
-[![Status](https://img.shields.io/badge/Status-Alpha%20v0.24.0001-orange.svg)](https://github.com/your-username/mojogui)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-blue.svg)](https://github.com/CodeAlexx/MojoGUI-UI)
+[![Status](https://img.shields.io/badge/Status-Alpha%20v0.24.0001-orange.svg)](https://github.com/CodeAlexx/MojoGUI-UI)
 
 ⚠️ **EXPERIMENTAL ALPHA SOFTWARE** - Not suitable for production use.
+
+---
+
+## 🦀 **Looking for Production-Ready?** → [EriGui (Rust)](https://github.com/CodeAlexx/EriGui)
+
+This Mojo/C framework has been **ported to pure Rust** as **EriGui** with significant improvements:
+
+| Feature | MojoGUI (This Repo) | EriGui (Rust Port) |
+|---------|---------------------|-------------------|
+| Status | Experimental Alpha | Production Quality |
+| Language | Mojo + C FFI | Pure Rust |
+| Widgets | 30+ (integration WIP) | 30+ (fully integrated) |
+| Safety | Manual memory mgmt | Rust memory safety |
+| Testing | Minimal | 71+ tests |
+| Node Graph | ❌ | ✅ Visual workflow editor |
+| File Manager | Basic prototype | Full-featured with image opening |
+
+**EriGui Features:**
+- Pure Rust with no C dependencies
+- Comprehensive test suite
+- Production-quality safety fixes
+- Node graph editor for visual workflows
+- Context menus with smart positioning
+- System file opening (images, documents)
+
+👉 **[Get EriGui](https://github.com/CodeAlexx/EriGui)** - Recommended for new projects
+
+---
 
 An experimental GUI framework for the [Mojo programming language](https://www.modular.com/mojo) featuring professional font rendering and basic UI components. This is a proof-of-concept demonstrating advanced text rendering with JetBrains Mono font integration.
 
@@ -63,7 +91,7 @@ This is **EXPERIMENTAL ALPHA SOFTWARE v0.24.0001**:
 
 #### **Option 1: Using Pixi (Recommended)**
 ```bash
-git clone https://github.com/your-username/mojogui.git
+git clone https://github.com/CodeAlexx/MojoGUI-UI.git
 cd mojogui
 pixi install
 pixi run build
@@ -72,7 +100,7 @@ pixi run test-font  # Requires mojo in PATH
 
 #### **Option 2: Manual Build**
 ```bash
-git clone https://github.com/your-username/mojogui.git
+git clone https://github.com/CodeAlexx/MojoGUI-UI.git
 cd mojogui
 # Install system dependencies
 sudo apt-get install build-essential pkg-config libglfw3-dev libgl1-mesa-dev
