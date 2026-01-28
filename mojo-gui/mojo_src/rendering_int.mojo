@@ -5,7 +5,7 @@ Uses only Int32 types to avoid FFI conversion issues.
 """
 
 from sys.ffi import external_call
-from sys import DLHandle
+from sys.ffi import OwnedDLHandle as DLHandle
 
 # Load the integer-only C library WITH TTF FONT SUPPORT!
 alias LIB_PATH = "./c_src/librendering_primitives_int_with_fonts.so"

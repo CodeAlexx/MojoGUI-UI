@@ -1,7 +1,7 @@
 #!/usr/bin/env mojo
 
-from sys.ffi import DLHandle
-from memory import UnsafePointer
+from sys.ffi import OwnedDLHandle
+from memory import LegacyUnsafePointer as UnsafePointer
 
 fn create_null_terminated_string(s: String) -> UnsafePointer[UInt8]:
     """Create a properly null-terminated string for C FFI."""
@@ -24,7 +24,7 @@ fn main() raises:
     print("Using working approach: Float32 API + String fix + Correct library")
     
     # Use the WORKING font library (Float32 API)
-    var lib = DLHandle("./mojo-gui/c_src/librendering_with_fonts.so")
+    var lib = OwnedDLHandle("./mojo-gui/c_src/librendering_with_fonts.so")
     print("✅ Working font library loaded")
     
     # Get functions with FLOAT32 API (the working approach)

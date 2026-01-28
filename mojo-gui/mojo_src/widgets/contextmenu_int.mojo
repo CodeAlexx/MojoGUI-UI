@@ -181,22 +181,45 @@ struct ContextMenuInt(BaseWidgetInt):
     
     fn show_at(inout self, x: Int32, y: Int32, parent_id: Int32 = -1):
         """Show the context menu at the specified position."""
+        self.show_at_bounded(x, y, 0, 0, 0, 0, parent_id)
+
+    fn show_at_bounded(inout self, x: Int32, y: Int32,
+                       viewport_x: Int32, viewport_y: Int32,
+                       viewport_width: Int32, viewport_height: Int32,
+                       parent_id: Int32 = -1):
+        """Show the context menu at position, bounded within viewport."""
         self.trigger_x = x
         self.trigger_y = y
         self.parent_widget_id = parent_id
-        
+
         # Recalculate size in case items changed
         self._recalculate_size()
-        
+
+        # Start with requested position
+        var final_x = x
+        var final_y = y
+
+        # Adjust position to stay within viewport bounds (if viewport specified)
+        if viewport_width > 0 and viewport_height > 0:
+            # Keep within right edge
+            if final_x + self.calculated_width > viewport_x + viewport_width:
+                final_x = viewport_x + viewport_width - self.calculated_width
+            # Keep within bottom edge
+            if final_y + self.calculated_height > viewport_y + viewport_height:
+                final_y = viewport_y + viewport_height - self.calculated_height
+            # Keep within left edge
+            if final_x < viewport_x:
+                final_x = viewport_x
+            # Keep within top edge
+            if final_y < viewport_y:
+                final_y = viewport_y
+
         # Position the menu
-        self.x = x
-        self.y = y
+        self.x = final_x
+        self.y = final_y
         self.width = self.calculated_width
         self.height = self.calculated_height
-        
-        # TODO: Adjust position if menu would go off screen
-        # This would require knowing screen dimensions
-        
+
         self.is_visible = True
         self.hovered_item = -1
         self.selected_item = -1
