@@ -5,7 +5,8 @@ Professional dropdown list with autocomplete, filtering, and custom item renderi
 """
 
 from sys.ffi import DLHandle, DLSymbol
-from memory import UnsafePointer
+from memory import alloc, UnsafePointer
+from builtin.type_aliases import MutExternalOrigin
 from ..widget_int import BaseWidgetInt
 
 # Constants
@@ -283,7 +284,7 @@ struct ComboBoxInt(BaseWidgetInt):
         var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
         var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
         var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
-        var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+        var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
         var draw_line = lib.get_function[fn(Int32, Int32, Int32, Int32, Int32) -> Int32]("draw_line")
 
         # Draw main combobox background
@@ -347,7 +348,7 @@ struct ComboBoxInt(BaseWidgetInt):
         var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
         var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
         var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
-        var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+        var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
 
         var dropdown_y = self.y + self.height
         var filtered_indices = self._get_filtered_items()

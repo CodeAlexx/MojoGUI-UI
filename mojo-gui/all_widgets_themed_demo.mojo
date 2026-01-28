@@ -3,8 +3,9 @@ ALL WIDGETS THEMED DEMO
 Comprehensive demonstration showing all major widgets using theme-based colors
 """
 
-from sys.ffi import DLHandle
-from memory import UnsafePointer
+from sys.ffi import OwnedDLHandle as DLHandle
+from memory import alloc, UnsafePointer
+from builtin.type_aliases import MutExternalOrigin
 
 alias WINDOW_WIDTH = 1200
 alias WINDOW_HEIGHT = 900
@@ -19,9 +20,9 @@ alias KEY_D = 68
 alias KEY_L = 76
 alias KEY_ESCAPE = 256
 
-fn null_terminated_string(text: String) -> UnsafePointer[Int8]:
+fn null_terminated_string(text: String) -> UnsafePointer[Int8, MutExternalOrigin]:
     var bytes = text.as_bytes()
-    var buffer = UnsafePointer[Int8].alloc(len(bytes) + 1)
+    var buffer = alloc[Int8](len(bytes) + 1)
     for i in range(len(bytes)):
         buffer[i] = Int8(bytes[i])
     buffer[len(bytes)] = 0
@@ -49,7 +50,7 @@ fn draw_widget_section(lib: DLHandle, x: Int32, y: Int32, width: Int32, height: 
     var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
     var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
     var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
-    var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+    var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
     
     # Section background
     _ = set_color(bg_color[0], bg_color[1], bg_color[2], bg_color[3])
@@ -72,7 +73,7 @@ fn draw_button_widget(lib: DLHandle, x: Int32, y: Int32, width: Int32, height: I
     var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
     var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
     var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
-    var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+    var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
     
     # Theme colors based on button type
     var bg_color: List[Int]
@@ -121,7 +122,7 @@ fn draw_checkbox_widget(lib: DLHandle, x: Int32, y: Int32, text: String, checked
     var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
     var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
     var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
-    var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+    var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
     var draw_line = lib.get_function[fn(Int32, Int32, Int32, Int32, Int32) -> Int32]("draw_line")
     
     var box_size = 18
@@ -160,7 +161,7 @@ fn draw_progress_bar(lib: DLHandle, x: Int32, y: Int32, width: Int32, height: In
     var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
     var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
     var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
-    var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+    var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
     
     var track_color = List[Int](220, 220, 220, 255) if not is_dark_mode else List[Int](60, 60, 80, 255)
     var fill_color = List[Int](50, 200, 80, 255)
@@ -195,7 +196,7 @@ fn draw_text_field(lib: DLHandle, x: Int32, y: Int32, width: Int32, height: Int3
     var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
     var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
     var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
-    var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+    var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
     var draw_line = lib.get_function[fn(Int32, Int32, Int32, Int32, Int32) -> Int32]("draw_line")
     
     var bg_color = List[Int](255, 255, 255, 255) if not is_dark_mode else List[Int](50, 50, 70, 255)
@@ -233,7 +234,7 @@ fn main() raises:
     
     var lib = DLHandle("./c_src/librendering_atlas.so")
     
-    var init_gl = lib.get_function[fn(Int32, Int32, UnsafePointer[Int8]) -> Int32]("initialize_gl_context")
+    var init_gl = lib.get_function[fn(Int32, Int32, UnsafePointer[Int8, MutExternalOrigin]) -> Int32]("initialize_gl_context")
     var title_ptr = null_terminated_string("All Widgets Themed Demo")
     
     if init_gl(WINDOW_WIDTH, WINDOW_HEIGHT, title_ptr) != 0:
@@ -253,7 +254,7 @@ fn main() raises:
     var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
     var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
     var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
-    var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+    var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
     
     # Check for system theme preference
     var get_system_dark_mode = lib.get_function[fn() -> Int32]("get_system_dark_mode")
@@ -300,8 +301,8 @@ fn main() raises:
         _ = poll_events()
         
         # Get mouse position
-        var mx_ptr = UnsafePointer[Float64].alloc(1)
-        var my_ptr = UnsafePointer[Float64].alloc(1)
+        var mx_ptr = alloc[Float64](1)
+        var my_ptr = alloc[Float64](1)
         _ = get_cursor_pos(mx_ptr, my_ptr)
         var mouse_x = Int32(mx_ptr[0])
         var mouse_y = Int32(my_ptr[0])

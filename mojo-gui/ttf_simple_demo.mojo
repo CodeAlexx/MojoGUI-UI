@@ -4,8 +4,9 @@ Simple TTF Font Demo for Mojo GUI
 Demonstrates the new integer API with REAL TTF font rendering.
 """
 
-from sys.ffi import DLHandle
-from memory import UnsafePointer
+from sys.ffi import OwnedDLHandle as DLHandle
+from memory import alloc, UnsafePointer
+from builtin.type_aliases import MutExternalOrigin
 
 fn main() raises:
     print("🎨 TTF Font Demo - Integer API with Professional Fonts")
@@ -15,7 +16,7 @@ fn main() raises:
     print("✅ TTF font library loaded successfully")
     
     # Get essential function pointers
-    var initialize_gl = lib.get_function[fn(Int32, Int32, UnsafePointer[UInt8]) -> Int32]("initialize_gl_context")
+    var initialize_gl = lib.get_function[fn(Int32, Int32, UnsafePointer[UInt8, MutExternalOrigin]) -> Int32]("initialize_gl_context")
     var load_font = lib.get_function[fn() -> Int32]("load_default_font")
     var cleanup = lib.get_function[fn() -> Int32]("cleanup_gl")
     var frame_begin = lib.get_function[fn() -> Int32]("frame_begin")
@@ -24,7 +25,7 @@ fn main() raises:
     var should_close = lib.get_function[fn() -> Int32]("should_close_window")
     var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
     var draw_rect = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
-    var draw_text = lib.get_function[fn(UnsafePointer[UInt8], Int32, Int32, Int32) -> Int32]("draw_text")
+    var draw_text = lib.get_function[fn(UnsafePointer[UInt8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
     
     # Initialize window
     print("🚀 Initializing window...")

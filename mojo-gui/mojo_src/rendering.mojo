@@ -4,7 +4,7 @@ Provides safe access to C OpenGL rendering functions.
 """
 
 from sys.ffi import external_call
-from sys import DLHandle
+from sys.ffi import OwnedDLHandle as DLHandle
 from memory import DTypePointer
 from utils import Variant
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env mojo
 
-from sys.ffi import DLHandle
-from memory import UnsafePointer
+from sys.ffi import OwnedDLHandle as DLHandle
+from memory import alloc, UnsafePointer
+from builtin.type_aliases import MutExternalOrigin
 
 fn main() raises:
     print("🔤 QUICK FONT QUALITY TEST")

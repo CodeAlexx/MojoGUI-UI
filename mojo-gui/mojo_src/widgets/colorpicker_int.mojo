@@ -5,7 +5,8 @@ Professional color selection with multiple styles, RGB/HSV support, and eyedropp
 """
 
 from sys.ffi import DLHandle, DLSymbol
-from memory import UnsafePointer
+from memory import alloc, UnsafePointer
+from builtin.type_aliases import MutExternalOrigin
 from math import sqrt, atan2, sin, cos, abs
 from ..widget_int import BaseWidgetInt
 
@@ -371,7 +372,7 @@ struct ColorPickerInt(BaseWidgetInt):
         var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
         var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
         var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
-        var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+        var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
 
         # Draw main color display
         _ = set_color(self.color_r, self.color_g, self.color_b, self.color_a)
@@ -406,7 +407,7 @@ struct ColorPickerInt(BaseWidgetInt):
         var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
         var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
         var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
-        var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+        var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
 
         var popup_x = self.x
         var popup_y = self.y + self.height + 5
@@ -477,7 +478,7 @@ struct ColorPickerInt(BaseWidgetInt):
         var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
         var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
         var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
-        var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+        var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
 
         var slider_x = popup_x + 50
         var slider_width = 200

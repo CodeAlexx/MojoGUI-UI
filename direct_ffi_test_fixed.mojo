@@ -1,7 +1,8 @@
 #!/usr/bin/env mojo
 
-from sys.ffi import DLHandle
-from memory import UnsafePointer
+from sys.ffi import OwnedDLHandle as DLHandle
+from memory import alloc, UnsafePointer
+from builtin.type_aliases import MutExternalOrigin
 
 fn main() raises:
     print("🧪 Direct FFI Test for MojoGUI - FIXED VERSION")
@@ -18,7 +19,7 @@ fn main() raises:
     tests_total += 1
     print("\n1. Testing Basic Graphics Functions...")
     try:
-        var initialize_gl = lib.get_function[fn(Int32, Int32, UnsafePointer[Int8]) -> Int32]("initialize_gl_context")
+        var initialize_gl = lib.get_function[fn(Int32, Int32, UnsafePointer[Int8, MutExternalOrigin]) -> Int32]("initialize_gl_context")
         var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
         var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
         
@@ -67,9 +68,9 @@ fn main() raises:
     print("\n3. Testing Text Rendering Functions...")
     try:
         var load_default_font = lib.get_function[fn() -> Int32]("load_default_font")
-        var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
-        var get_text_width = lib.get_function[fn(UnsafePointer[Int8], Int32) -> Int32]("get_text_width")
-        var get_text_height = lib.get_function[fn(UnsafePointer[Int8], Int32) -> Int32]("get_text_height")
+        var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
+        var get_text_width = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32) -> Int32]("get_text_width")
+        var get_text_height = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32) -> Int32]("get_text_height")
         
         var font_result = load_default_font()
         print("   load_default_font result:", font_result)
@@ -153,7 +154,7 @@ fn main() raises:
     tests_total += 1
     print("\n6. Testing Text Input Functions...")
     try:
-        var get_input_text = lib.get_function[fn() -> UnsafePointer[Int8]]("get_input_text")
+        var get_input_text = lib.get_function[fn() -> UnsafePointer[Int8, MutExternalOrigin]]("get_input_text")
         var has_new_input = lib.get_function[fn() -> Int32]("has_new_input")
         var clear_input_buffer = lib.get_function[fn() -> Int32]("clear_input_buffer")
         var get_input_length = lib.get_function[fn() -> Int32]("get_input_length")

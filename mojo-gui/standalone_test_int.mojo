@@ -5,7 +5,7 @@ Self-contained test with all code in one file.
 """
 
 from sys.ffi import external_call
-from sys import DLHandle
+from sys.ffi import OwnedDLHandle as DLHandle
 
 struct RenderingContextInt:
     """Integer-only rendering context."""

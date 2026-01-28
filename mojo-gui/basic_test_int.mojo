@@ -5,7 +5,8 @@ Simple test using proven patterns from working MojoGUI system.
 """
 
 from sys.ffi import external_call
-from memory import UnsafePointer
+from memory import alloc, UnsafePointer
+from builtin.type_aliases import MutExternalOrigin
 
 fn test_integer_ffi():
     """Test the integer-only C library from Mojo."""

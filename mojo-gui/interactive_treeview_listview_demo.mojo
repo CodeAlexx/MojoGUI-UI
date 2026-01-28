@@ -3,8 +3,9 @@ INTERACTIVE TREEVIEW AND LISTVIEW DEMO
 Real implementation using actual TreeView and ListView widgets
 """
 
-from sys.ffi import DLHandle
-from memory import UnsafePointer
+from sys.ffi import OwnedDLHandle as DLHandle
+from memory import alloc, UnsafePointer
+from builtin.type_aliases import MutExternalOrigin
 from .mojo_src.rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
 from .mojo_src.widgets.treeview_int import TreeViewInt, NODE_FOLDER, NODE_FILE
 from .mojo_src.widgets.listview_int import ListViewInt, LISTVIEW_STYLE_REPORT, SELECTION_SINGLE
@@ -24,9 +25,9 @@ alias KEY_D = 68
 alias KEY_L = 76
 alias KEY_ESCAPE = 256
 
-fn null_terminated_string(text: String) -> UnsafePointer[Int8]:
+fn null_terminated_string(text: String) -> UnsafePointer[Int8, MutExternalOrigin]:
     var bytes = text.as_bytes()
-    var buffer = UnsafePointer[Int8].alloc(len(bytes) + 1)
+    var buffer = alloc[Int8](len(bytes) + 1)
     for i in range(len(bytes)):
         buffer[i] = Int8(bytes[i])
     buffer[len(bytes)] = 0
@@ -121,7 +122,7 @@ fn main() raises:
     
     var lib = DLHandle("./c_src/librendering_atlas.so")
     
-    var init_gl = lib.get_function[fn(Int32, Int32, UnsafePointer[Int8]) -> Int32]("initialize_gl_context")
+    var init_gl = lib.get_function[fn(Int32, Int32, UnsafePointer[Int8, MutExternalOrigin]) -> Int32]("initialize_gl_context")
     var title_ptr = null_terminated_string("Interactive TreeView & ListView Demo")
     
     if init_gl(WINDOW_WIDTH, WINDOW_HEIGHT, title_ptr) != 0:
@@ -141,7 +142,7 @@ fn main() raises:
     var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
     var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
     var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
-    var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+    var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
     var draw_line = lib.get_function[fn(Int32, Int32, Int32, Int32, Int32) -> Int32]("draw_line")
     
     var get_system_dark_mode = lib.get_function[fn() -> Int32]("get_system_dark_mode")
@@ -190,8 +191,8 @@ fn main() raises:
         _ = poll_events()
         
         # Get mouse position
-        var mx_ptr = UnsafePointer[Float64].alloc(1)
-        var my_ptr = UnsafePointer[Float64].alloc(1)
+        var mx_ptr = alloc[Float64](1)
+        var my_ptr = alloc[Float64](1)
         _ = get_cursor_pos(mx_ptr, my_ptr)
         var mouse_x = Int32(mx_ptr[0])
         var mouse_y = Int32(my_ptr[0])

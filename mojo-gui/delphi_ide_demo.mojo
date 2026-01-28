@@ -1,7 +1,8 @@
 #!/usr/bin/env mojo
 
-from sys.ffi import DLHandle
-from memory import UnsafePointer
+from sys.ffi import OwnedDLHandle as DLHandle
+from memory import alloc, UnsafePointer
+from builtin.type_aliases import MutExternalOrigin
 
 fn main() raises:
     print("🏗️  DELPHI-STYLE IDE DEMO - Split Tabs with Tooltips!")
@@ -12,7 +13,7 @@ fn main() raises:
     print("✅ Font-enabled library loaded")
     
     # Get functions
-    var initialize_gl = lib.get_function[fn(Int32, Int32, UnsafePointer[Int8]) -> Int32]("initialize_gl_context")
+    var initialize_gl = lib.get_function[fn(Int32, Int32, UnsafePointer[Int8, MutExternalOrigin]) -> Int32]("initialize_gl_context")
     var cleanup_gl = lib.get_function[fn() -> Int32]("cleanup_gl")
     var frame_begin = lib.get_function[fn() -> Int32]("frame_begin")
     var frame_end = lib.get_function[fn() -> Int32]("frame_end")
@@ -21,7 +22,7 @@ fn main() raises:
     var draw_rectangle = lib.get_function[fn(Float32, Float32, Float32, Float32) -> Int32]("draw_rectangle")
     var draw_filled_circle = lib.get_function[fn(Float32, Float32, Float32, Int32) -> Int32]("draw_filled_circle")
     var draw_line = lib.get_function[fn(Float32, Float32, Float32, Float32, Float32) -> Int32]("draw_line")
-    var draw_text = lib.get_function[fn(UnsafePointer[Int8], Float32, Float32, Float32) -> Int32]("draw_text")
+    var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Float32, Float32, Float32) -> Int32]("draw_text")
     var load_default_font = lib.get_function[fn() -> Int32]("load_default_font")
     var poll_events = lib.get_function[fn() -> Int32]("poll_events")
     var should_close_window = lib.get_function[fn() -> Int32]("should_close_window")

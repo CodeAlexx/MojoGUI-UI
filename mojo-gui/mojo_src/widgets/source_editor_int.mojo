@@ -478,7 +478,7 @@ struct SourceEditorInt(BaseWidgetInt):
         var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
         var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
         var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
-        var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+        var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
 
         # Background
         _ = set_color(self.bg_color.r, self.bg_color.g, self.bg_color.b, self.bg_color.a)

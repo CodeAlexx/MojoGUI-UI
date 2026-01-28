@@ -1,7 +1,8 @@
 #!/usr/bin/env mojo
 
-from sys.ffi import DLHandle
-from memory import UnsafePointer
+from sys.ffi import OwnedDLHandle as DLHandle
+from memory import alloc, UnsafePointer
+from builtin.type_aliases import MutExternalOrigin
 
 fn main() raises:
     print("🧪 Simple Integer-Only GUI Test")
@@ -11,7 +12,7 @@ fn main() raises:
     print("✅ Library loaded")
     
     # Get basic functions
-    var initialize_gl = lib.get_function[fn(Int32, Int32, UnsafePointer[Int8]) -> Int32]("initialize_gl_context")
+    var initialize_gl = lib.get_function[fn(Int32, Int32, UnsafePointer[Int8, MutExternalOrigin]) -> Int32]("initialize_gl_context")
     var cleanup_gl = lib.get_function[fn() -> Int32]("cleanup_gl")
     var frame_begin = lib.get_function[fn() -> Int32]("frame_begin")
     var frame_end = lib.get_function[fn() -> Int32]("frame_end")

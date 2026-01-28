@@ -3,8 +3,9 @@ TREEVIEW AND LISTVIEW DEMO
 Comprehensive demonstration of TreeView and ListView widgets with file manager interface
 """
 
-from sys.ffi import DLHandle
-from memory import UnsafePointer
+from sys.ffi import OwnedDLHandle as DLHandle
+from memory import alloc, UnsafePointer
+from builtin.type_aliases import MutExternalOrigin
 
 alias WINDOW_WIDTH = 1000
 alias WINDOW_HEIGHT = 700
@@ -19,9 +20,9 @@ alias KEY_D = 68
 alias KEY_L = 76
 alias KEY_ESCAPE = 256
 
-fn null_terminated_string(text: String) -> UnsafePointer[Int8]:
+fn null_terminated_string(text: String) -> UnsafePointer[Int8, MutExternalOrigin]:
     var bytes = text.as_bytes()
-    var buffer = UnsafePointer[Int8].alloc(len(bytes) + 1)
+    var buffer = alloc[Int8](len(bytes) + 1)
     for i in range(len(bytes)):
         buffer[i] = Int8(bytes[i])
     buffer[len(bytes)] = 0
@@ -33,7 +34,7 @@ fn draw_treeview_mockup(lib: DLHandle, x: Int32, y: Int32, width: Int32, height:
     var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
     var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
     var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
-    var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+    var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
     var draw_line = lib.get_function[fn(Int32, Int32, Int32, Int32, Int32) -> Int32]("draw_line")
     
     # Theme colors
@@ -114,7 +115,7 @@ fn draw_listview_mockup(lib: DLHandle, x: Int32, y: Int32, width: Int32, height:
     var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
     var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
     var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
-    var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+    var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
     
     # Theme colors
     var bg_color = List[Int](25, 25, 35, 255) if is_dark_mode else List[Int](255, 255, 255, 255)
@@ -295,7 +296,7 @@ fn main() raises:
     
     var lib = DLHandle("./c_src/librendering_atlas.so")
     
-    var init_gl = lib.get_function[fn(Int32, Int32, UnsafePointer[Int8]) -> Int32]("initialize_gl_context")
+    var init_gl = lib.get_function[fn(Int32, Int32, UnsafePointer[Int8, MutExternalOrigin]) -> Int32]("initialize_gl_context")
     var title_ptr = null_terminated_string("TreeView & ListView Demo")
     
     if init_gl(WINDOW_WIDTH, WINDOW_HEIGHT, title_ptr) != 0:
@@ -314,7 +315,7 @@ fn main() raises:
     var cleanup_gl = lib.get_function[fn() -> Int32]("cleanup_gl")
     var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
     var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
-    var draw_text = lib.get_function[fn(UnsafePointer[Int8], Int32, Int32, Int32) -> Int32]("draw_text")
+    var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
     
     var get_system_dark_mode = lib.get_function[fn() -> Int32]("get_system_dark_mode")
     var get_cursor_pos = lib.get_function[fn(UnsafePointer[Float64], UnsafePointer[Float64]) -> Int32]("get_cursor_position")
@@ -357,8 +358,8 @@ fn main() raises:
         _ = poll_events()
         
         # Get mouse position
-        var mx_ptr = UnsafePointer[Float64].alloc(1)
-        var my_ptr = UnsafePointer[Float64].alloc(1)
+        var mx_ptr = alloc[Float64](1)
+        var my_ptr = alloc[Float64](1)
         _ = get_cursor_pos(mx_ptr, my_ptr)
         var mouse_x = Int32(mx_ptr[0])
         var mouse_y = Int32(my_ptr[0])
