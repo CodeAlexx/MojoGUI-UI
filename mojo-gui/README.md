@@ -1,6 +1,24 @@
-# Mojo GUI with Minimal FFI
+# MojoGUI - GUI Framework for Mojo
 
-A GUI library implementation that minimizes FFI usage by keeping only essential OpenGL rendering primitives in C and implementing all widget logic in pure Mojo.
+A GUI framework for Mojo with minimal FFI, keeping only essential OpenGL rendering primitives in C while implementing all widget logic in pure Mojo.
+
+## Screenshots
+
+### Node Graph Demo
+![Node Graph Demo](screenshots/node_graph_demo.png)
+
+*Visual node editor with draggable nodes, connections, and real-time rendering*
+
+## Quick Start
+
+```bash
+# Build C library
+cd c_src && make
+
+# Run demos
+pixi run mojo node_graph_demo.mojo
+pixi run mojo enhanced_checkbox_demo.mojo
+```
 
 ## Architecture
 
@@ -17,183 +35,85 @@ A GUI library implementation that minimizes FFI usage by keeping only essential 
 ├─────────────────────────────────────────┤
 │  • Minimal C Interface                  │
 │  • OpenGL Rendering Primitives Only    │
-│  • Simple Function Signatures          │
+│  • Colors: Float32 0.0-1.0 range       │
 │  • No Complex Structs in FFI           │
 └─────────────────────────────────────────┘
 ```
 
-## Key Benefits
+## Key Features
 
 - **Minimal FFI Surface**: Only basic rendering primitives cross the FFI boundary
-- **Reduced Segfault Risk**: Complex widget logic stays in memory-safe Mojo
-- **Type Safety**: All widget interactions are type-checked by Mojo
-- **Maintainability**: Widget behavior is implemented in high-level Mojo code
-- **Performance**: Direct OpenGL calls for rendering primitives
+- **Memory Safe**: Complex widget logic stays in Mojo
+- **TTF Font Support**: Professional font rendering with stb_truetype
+- **Mojo 0.26.x Compatible**: Updated syntax (`comptime`, `out self`, `mut self`)
 
 ## Project Structure
 
 ```
 mojo-gui/
-├── c_src/                          # Minimal C library
-│   ├── rendering_primitives.h      # C header with simple interface
-│   ├── rendering_primitives.c      # OpenGL rendering implementation
-│   ├── Makefile                    # Build system for C library
-│   ├── test_primitives.c           # C test program
-│   └── test_python_ffi.py          # Python FFI test
-├── mojo_src/                       # Pure Mojo implementation
-│   ├── rendering.mojo              # FFI bindings and safe wrappers
-│   ├── widget.mojo                 # Base widget system
-│   └── widgets/
-│       ├── textlabel.mojo          # Text display widget
-│       └── button.mojo             # Interactive button widget
-└── examples/
-    ├── simple_demo.mojo            # Basic demo
-    └── enhanced_demo.mojo          # Full-featured demo
+├── c_src/                           # C rendering backend
+│   ├── rendering_with_fonts.c       # OpenGL + TTF font rendering
+│   └── librendering_with_fonts.so   # Compiled library
+├── mojo_src/                        # Pure Mojo modules
+│   ├── rendering_int.mojo           # Integer API wrapper
+│   ├── theme_system.mojo            # Theme colors
+│   └── widgets/                     # Widget implementations
+├── node_graph_demo.mojo             # Visual node editor demo
+├── enhanced_checkbox_demo.mojo      # Checkbox styles demo
+└── screenshots/                     # Demo screenshots
 ```
 
-## C Interface (Minimal)
+## C Interface
 
-The C library provides only essential rendering primitives:
+Colors use Float32 in 0.0-1.0 range for OpenGL:
 
 ```c
-// Initialization and cleanup
-int initialize_gl_context(int width, int height, const char* title);
-int cleanup_gl(void);
-
-// Frame management
-int frame_begin(void);
-int frame_end(void);
-
-// Basic drawing primitives
-int set_color(float r, float g, float b, float a);
-int draw_rectangle(float x, float y, float width, float height);
-int draw_filled_rectangle(float x, float y, float width, float height);
-int draw_circle(float x, float y, float radius, int segments);
-int draw_filled_circle(float x, float y, float radius, int segments);
-int draw_line(float x1, float y1, float x2, float y2, float thickness);
+int set_color(float r, float g, float b, float a);  // 0.0-1.0 range
+int draw_filled_rectangle(float x, float y, float w, float h);
 int draw_text(const char* text, float x, float y, float size);
-
-// Event polling (simple interface)
-int poll_events(void);
-int get_mouse_button_state(int button);
-int get_key_state(int key_code);
-int should_close_window(void);
+int draw_line(float x1, float y1, float x2, float y2, float thickness);
 ```
 
-## Mojo Widget System
+## FFI Pattern
 
-All widget logic is implemented in pure Mojo:
-
-### Base Widget Trait
 ```mojo
-trait Widget:
-    fn render(self, ctx: RenderingContext)
-    fn handle_mouse_event(inout self, event: MouseEvent) -> Bool
-    fn handle_key_event(inout self, event: KeyEvent) -> Bool
-    fn update(inout self)
+from sys.ffi import OwnedDLHandle as DLHandle
+from memory import alloc, UnsafePointer
+from builtin.type_aliases import MutExternalOrigin
+
+fn null_terminated_string(text: String) -> UnsafePointer[Int8, MutExternalOrigin]:
+    var bytes = text.as_bytes()
+    var buffer = alloc[Int8](len(bytes) + 1)
+    for i in range(len(bytes)):
+        buffer[i] = Int8(bytes[i])
+    buffer[len(bytes)] = 0
+    return buffer
+
+fn main() raises:
+    var lib = DLHandle("./c_src/librendering_with_fonts.so")
+    var set_color = lib.get_function[fn(Float32, Float32, Float32, Float32) -> Int32]("set_color")
+
+    # Colors normalized: RGB 128,128,128 -> 0.5, 0.5, 0.5
+    _ = set_color(0.5, 0.5, 0.5, 1.0)
 ```
 
-### Available Widgets
-- **TextLabel**: Text display with alignment and styling
-- **Button**: Interactive buttons with hover/press states and callbacks
-- **Container**: Widget hierarchies and layout management
+## Demos
 
-### Event System
-- Mouse events (click, hover, drag)
-- Keyboard events
-- Event propagation through widget hierarchies
-- Type-safe event handling
-
-## Building and Running
-
-### 1. Build C Library
-```bash
-cd c_src
-make
-```
-
-### 2. Test C Library
-```bash
-# Test with C
-make test_run
-
-# Test with Python FFI
-python3 test_python_ffi.py
-```
-
-### 3. Run Mojo Demos (when Mojo supports FFI)
-```bash
-# Simple demo
-mojo examples/simple_demo.mojo
-
-# Enhanced demo with multiple widgets
-mojo examples/enhanced_demo.mojo
-```
+| Demo | Description |
+|------|-------------|
+| `node_graph_demo.mojo` | Visual node editor with draggable nodes and bezier connections |
+| `enhanced_checkbox_demo.mojo` | Square and round checkbox styles with colors |
+| `delphi_ide_demo.mojo` | IDE-style interface with panels |
 
 ## Current Status
 
-✅ **Completed:**
-- Minimal C rendering interface
-- C library with OpenGL primitives
-- FFI-friendly function signatures
-- Mojo widget system design
-- TextLabel widget implementation
-- Button widget with interactions
-- Event handling system
-- Container/hierarchy system
-- Demo applications
+- Working with Mojo 0.26.x syntax
+- TTF font rendering functional
+- Node graph demo fully operational
+- Direct FFI pattern (no module imports needed)
 
-🚧 **Pending Mojo FFI Support:**
-- The Mojo code is ready but waiting for stable FFI support
-- All designs are tested with Python FFI simulation
-- C library is fully functional and tested
+## Requirements
 
-## Design Principles
-
-1. **Minimal FFI**: Only basic types (int, float, char*) cross FFI boundary
-2. **Safe Boundaries**: No complex structs or memory management in FFI
-3. **Pure Mojo Logic**: All widget behavior implemented in Mojo
-4. **Simple C Interface**: C code only handles OpenGL rendering
-5. **Type Safety**: Mojo's type system catches errors early
-6. **Extensibility**: Easy to add new widgets in pure Mojo
-
-## Example Usage
-
-```mojo
-from mojo_src.rendering import RenderingContext
-from mojo_src.widget import WidgetContainer
-from mojo_src.widgets.button import create_primary_button
-
-fn button_clicked():
-    print("Button was clicked!")
-
-fn main():
-    # Initialize rendering
-    var ctx = RenderingContext()
-    ctx.initialize(800, 600, "My App")
-    
-    # Create widgets
-    var root = WidgetContainer(0, 0, 800, 600)
-    var button = create_primary_button(100, 100, 120, 40, "Click Me")
-    button.set_click_callback(button_clicked)
-    root.add_child(button)
-    
-    # Render loop
-    while not ctx.should_close_window():
-        ctx.frame_begin()
-        root.render(ctx)
-        ctx.frame_end()
-    
-    ctx.cleanup()
-```
-
-## Advantages Over Full FFI Approach
-
-1. **Stability**: Fewer FFI calls = fewer potential segfaults
-2. **Debuggability**: Widget logic in Mojo is easier to debug
-3. **Type Safety**: Mojo catches type errors at compile time
-4. **Memory Safety**: Mojo handles memory management for widgets
-5. **Performance**: Direct OpenGL calls for hot rendering paths
-6. **Maintainability**: High-level widget code in readable Mojo
-
-This architecture provides the best of both worlds: the performance of OpenGL rendering with the safety and expressiveness of Mojo for application logic.
+- Mojo 0.26.x+
+- OpenGL/GLFW
+- pixi (for environment management)
