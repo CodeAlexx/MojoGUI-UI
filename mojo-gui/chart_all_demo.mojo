@@ -5,8 +5,8 @@ A single window that exercises the whole chart addon so you can eyeball it:
 
   * ALL 20 chart types          — SPACE / BACKSPACE to cycle
   * ALL 5 theme presets         — T to cycle (dark/light/midnight/classic/hi-contrast)
-  * Indicator overlays          — I to toggle: SMA(20) + EMA(12) on price, RSI(14) sub-pane
-  * Drawing tools               — D to toggle: a TrendLine + a Fibonacci retracement
+  * ALL 20 indicators           — I cycles through them (price overlay, or an oscillator pane)
+  * ALL 14 drawing tools        — D cycles through them (rendered on sample points)
   * Pan / zoom / grid / crosshair — arrow keys pan, +/- zoom, G grid, C crosshair, R reset
 
 Runs at normal resolution (no screen/DPI scaling).
@@ -19,7 +19,7 @@ Compile-only check (no window, no GPU):
 Data is a deterministic seeded random-walk (identical every run; no clock/RNG builtins).
 """
 
-from mojo_src.rendering_int import RenderingContextInt
+from mojo_src.rendering_int import RenderingContextInt, ColorInt
 from mojo_src.widget_int import KeyEventInt
 from mojo_src.widgets.chart.model import (
     Bar, BarData,
@@ -30,7 +30,7 @@ from mojo_src.widgets.chart.theme import ChartTheme
 from mojo_src.widgets.chart.builder import ChartBuilder
 from mojo_src.widgets.chart.engine import ChartInt
 from mojo_src.widgets.chart.studies import (
-    Indicator, IndicatorSeries, LinearMap, draw_indicator_line,
+    Indicator, IndicatorRegistry, IndicatorSeries, LinearMap, draw_indicator_line,
 )
 from mojo_src.widgets.chart.drawings import ChartPoint, Drawing, DrawingRegistry
 
@@ -138,6 +138,54 @@ fn theme_name(idx: Int) -> String:
 
 
 # =============================================================================
+# Indicator / drawing rendering helpers.
+# =============================================================================
+
+struct VRange(ImplicitlyCopyable, Movable):
+    """A padded [lo, hi] value range for fitting an oscillator sub-pane."""
+    var lo: Float64
+    var hi: Float64
+
+    fn __init__(out self, lo: Float64, hi: Float64):
+        self.lo = lo
+        self.hi = hi
+
+
+fn series_vrange(series: IndicatorSeries) -> VRange:
+    """Min/max across every valid bar and line, padded 8% (for pane fit)."""
+    var lo = 1.0e18
+    var hi = -1.0e18
+    for i in range(series.len()):
+        if series.is_valid(i):
+            for li in range(series.line_cnt):
+                var v = series.line(i, li)
+                if v < lo:
+                    lo = v
+                if v > hi:
+                    hi = v
+    if hi <= lo:
+        return VRange(0.0, 1.0)
+    var pad = (hi - lo) * 0.08
+    return VRange(lo - pad, hi + pad)
+
+
+fn line_rgb(idx: Int) -> ColorInt:
+    """Distinct colour per indicator line (cycled)."""
+    var i = idx % 6
+    if i == 0:
+        return ColorInt(240, 200, 60, 255)    # yellow
+    if i == 1:
+        return ColorInt(80, 200, 230, 255)     # cyan
+    if i == 2:
+        return ColorInt(200, 120, 230, 255)    # purple
+    if i == 3:
+        return ColorInt(120, 220, 130, 255)    # green
+    if i == 4:
+        return ColorInt(240, 130, 90, 255)     # orange
+    return ColorInt(185, 192, 210, 255)        # grey
+
+
+# =============================================================================
 # Main demo loop.
 # =============================================================================
 
@@ -147,12 +195,6 @@ fn main() raises:
 
     var data = generate_sample_bars(180)
     print("Generated", data.len(), "synthetic bars")
-
-    # Precompute indicators once (data is static).
-    var sma = Indicator.sma(20).calculate(data.bars)
-    var ema = Indicator.ema(12).calculate(data.bars)
-    var rsi = Indicator.rsi(14).calculate(data.bars)
-    print("Indicators: SMA(20), EMA(12), RSI(14) computed")
 
     # Build the chart via the fluent builder.
     var builder = ChartBuilder.new()
@@ -168,28 +210,22 @@ fn main() raises:
     chart.height = WIN_H
     chart.set_data(data.copy())
 
-    # Pre-build two drawings in chart space (bar_idx, price) using real data points.
+    # Registries — cycle through EVERY indicator and drawing tool.
     var n = data.len()
     var i_a = 20
     var i_b = n - 20 if n - 20 > i_a else n - 1
-    var reg = DrawingRegistry()
-    var trend = reg.begin(String("TrendLine"),
-                          ChartPoint(Float64(i_a), data.bars[i_a].low))
-    trend.drag(ChartPoint(Float64(i_b), data.bars[i_b].high))
-    _ = trend.commit()
-    trend.set_color(255, 200, 60, 255)
-
-    var fib = reg.begin(String("FibRetracement"),
-                        ChartPoint(Float64(i_a), data.bars[i_a].high))
-    fib.drag(ChartPoint(Float64(i_b), data.bars[i_b].low))
-    _ = fib.commit()
-    fib.set_color(120, 180, 255, 200)
+    var i_mid = (i_a + i_b) // 2
+    var ind_reg = IndicatorRegistry()
+    var ind_names = ind_reg.list()       # all 20 indicator names
+    var draw_reg = DrawingRegistry()
+    var draw_names = draw_reg.list()      # all 14 drawing-tool names
+    print("Registry:", len(ind_names), "indicators,", len(draw_names), "drawing tools")
 
     var types = all_chart_types()
     var type_index: Int = 0
     var theme_index: Int = 0
-    var show_indicators: Bool = True
-    var show_drawings: Bool = True
+    var ind_index: Int = 1     # 0 = off; 1..N shows ind_names[idx-1]
+    var draw_index: Int = 1    # 0 = off; 1..N shows draw_names[idx-1]
 
     # --- Open the window ----------------------------------------------------
     var ctx = RenderingContextInt(String("./c_src/librendering_with_fonts.so"))
@@ -235,9 +271,9 @@ fn main() raises:
             theme_index = (theme_index + 1) % 5
             apply_theme(chart, theme_for(theme_index))
         if ik and not i_down:
-            show_indicators = not show_indicators
+            ind_index = (ind_index + 1) % (len(ind_names) + 1)
         if dk and not d_down:
-            show_drawings = not show_drawings
+            draw_index = (draw_index + 1) % (len(draw_names) + 1)
 
         sp_down = sp
         bk_down = bk
@@ -270,49 +306,59 @@ fn main() raises:
             chart.plot_y(), chart.plot_bottom(),
         )
 
-        if show_indicators:
-            # SMA(20) yellow, EMA(12) cyan — overlaid on price.
-            draw_indicator_line(ctx, sma, 0, lm, 240, 200, 60, 255, 2)
-            draw_indicator_line(ctx, ema, 0, lm, 80, 200, 230, 255, 2)
+        if ind_index > 0:
+            var iname = ind_names[ind_index - 1]
+            var ind = ind_reg.create(iname)
+            var series = ind.calculate(data.bars)
+            if ind.is_overlay():
+                # Plot directly on the price axis (MAs, bands, VWAP, channels).
+                for li in range(series.line_cnt):
+                    var c = line_rgb(li)
+                    draw_indicator_line(ctx, series, li, lm, c.r, c.g, c.b, 255, 2)
+            else:
+                # Oscillator: translucent sub-pane fit to the series' own range.
+                var pane_h = chart.plot_height() // 4
+                var pane_top = chart.plot_bottom() - pane_h
+                _ = ctx.set_color(10, 12, 18, 165)
+                _ = ctx.draw_filled_rectangle(chart.plot_x(), pane_top,
+                                              chart.plot_width(), pane_h)
+                var vr = series_vrange(series)
+                var pane_lm = LinearMap(chart.bar_index_to_x(0), chart.bar_spacing,
+                                        vr.lo, vr.hi, pane_top, chart.plot_bottom())
+                for li in range(series.line_cnt):
+                    var c = line_rgb(li)
+                    draw_indicator_line(ctx, series, li, pane_lm, c.r, c.g, c.b, 255, 2)
+                _ = ctx.set_color(205, 211, 224, 255)
+                _ = ctx.draw_text(iname, chart.plot_x() + 6, pane_top + 4, font_sm)
 
-            # RSI(14) in a translucent sub-pane along the bottom of the plot.
-            var pane_h = chart.plot_height() // 5
-            var pane_top = chart.plot_bottom() - pane_h
-            _ = ctx.set_color(10, 12, 18, 150)
-            _ = ctx.draw_filled_rectangle(chart.plot_x(), pane_top,
-                                          chart.plot_width(), pane_h)
-            var rsi_map = LinearMap(chart.bar_index_to_x(0), chart.bar_spacing,
-                                    0.0, 100.0, pane_top, chart.plot_bottom())
-            # 30 / 70 guide lines.
-            _ = ctx.set_color(90, 96, 110, 150)
-            _ = ctx.draw_line(chart.plot_x(), rsi_map.price_to_y(70.0),
-                              chart.plot_right(), rsi_map.price_to_y(70.0), 1)
-            _ = ctx.draw_line(chart.plot_x(), rsi_map.price_to_y(30.0),
-                              chart.plot_right(), rsi_map.price_to_y(30.0), 1)
-            draw_indicator_line(ctx, rsi, 0, rsi_map, 200, 120, 230, 255, 2)
-            _ = ctx.set_color(200, 120, 230, 255)
-            _ = ctx.draw_text(String("RSI(14)"), chart.plot_x() + 6, pane_top + 4, font_sm)
-
-        if show_drawings:
-            trend.draw(ctx, lm)
-            fib.draw(ctx, lm)
+        if draw_index > 0:
+            # Construct the current tool on sample data points and render it.
+            var dname = draw_names[draw_index - 1]
+            var d = draw_reg.begin(dname, ChartPoint(Float64(i_a), data.bars[i_a].low))
+            if d.required_points() >= 2:
+                d.drag(ChartPoint(Float64(i_b), data.bars[i_b].high))
+            if d.required_points() >= 3:
+                d.drag(ChartPoint(Float64(i_mid), data.bars[i_mid].close))
+            _ = d.commit()
+            d.set_color(255, 200, 60, 235)
+            d.draw(ctx, lm)
 
         # --- Header strip + legend (drawn on top) ---------------------------
         _ = ctx.set_color(0, 0, 0, 190)
         _ = ctx.draw_filled_rectangle(0, 0, WIN_W, header_h)
         _ = ctx.set_color(235, 235, 240, 255)
         var ct = types[type_index]
-        var ind_s = String("on") if show_indicators else String("off")
-        var drw_s = String("on") if show_drawings else String("off")
+        var ind_s = String("off") if ind_index == 0 else ind_names[ind_index - 1]
+        var drw_s = String("off") if draw_index == 0 else draw_names[draw_index - 1]
         var header = String("DEMOUSD 1h  |  ") + ct.name() \
             + String("  [") + String(type_index + 1) + String("/20]") \
             + String("  |  theme: ") + theme_name(theme_index) \
-            + String("  |  indicators: ") + ind_s \
-            + String("  |  drawings: ") + drw_s
+            + String("  |  ind: ") + ind_s \
+            + String("  |  draw: ") + drw_s
         _ = ctx.draw_text(header, 10, 9, font_lg)
         _ = ctx.set_color(150, 156, 170, 255)
         _ = ctx.draw_text(
-            String("SPACE/BACKSPACE type  T theme  I indicators  D drawings  arrows pan  +/- zoom  G grid  C crosshair  R reset"),
+            String("SPACE/BACKSPACE type  T theme  I cycle indicator  D cycle drawing  arrows pan  +/- zoom  G grid  C crosshair  R reset"),
             10, header_h + 4, font_sm)
 
         _ = ctx.frame_end()
