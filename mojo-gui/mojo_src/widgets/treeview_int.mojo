@@ -10,16 +10,16 @@ from .scrollbar_int import ScrollBarInt
 from ..theme_system import get_theme
 
 # Tree node states
-alias NODE_COLLAPSED = 0
-alias NODE_EXPANDED = 1
-alias NODE_EXPANDING = 2  # For animation
+comptime NODE_COLLAPSED = 0
+comptime NODE_EXPANDED = 1
+comptime NODE_EXPANDING = 2  # For animation
 
 # Tree node types
-alias NODE_FOLDER = 0
-alias NODE_FILE = 1
-alias NODE_CATEGORY = 2
+comptime NODE_FOLDER = 0
+comptime NODE_FILE = 1
+comptime NODE_CATEGORY = 2
 
-struct TreeNode:
+struct TreeNode(Copyable, Movable):
     """Individual tree node."""
     var id: Int32
     var parent_id: Int32
@@ -34,7 +34,7 @@ struct TreeNode:
     var data: Int32  # User data
     var icon_color: ColorInt
     
-    fn __init__(inout self, id: Int32, text: String, node_type: Int32 = NODE_FOLDER):
+    fn __init__(out self, id: Int32, text: String, node_type: Int32 = NODE_FOLDER):
         self.id = id
         self.parent_id = -1
         self.text = text
@@ -46,19 +46,19 @@ struct TreeNode:
         self.is_selected = False
         self.is_visible = True
         self.data = 0
-        let theme = get_theme()
+        var theme = get_theme()
         self.icon_color = theme.primary_text
     
-    fn add_child(inout self, child_id: Int32):
+    fn add_child(mut self, child_id: Int32):
         """Add a child node ID."""
         self.children.append(child_id)
-    
-    fn remove_child(inout self, child_id: Int32):
+
+    fn remove_child(mut self, child_id: Int32):
         """Remove a child node ID."""
         # Find and remove child
         for i in range(len(self.children)):
             if self.children[i] == child_id:
-                self.children.remove(i)
+                _ = self.children.pop(i)
                 break
     
     fn has_children(self) -> Bool:
@@ -69,9 +69,18 @@ struct TreeNode:
         """Check if node is expanded."""
         return self.state == NODE_EXPANDED
 
-struct TreeViewInt(BaseWidgetInt):
+struct TreeViewInt(WidgetInt, Copyable, Movable):
     """Hierarchical tree view widget."""
-    
+
+    # Inlined BaseWidgetInt fields (struct inheritance is not supported).
+    var bounds: RectInt
+    var visible: Bool
+    var enabled: Bool
+    var background_color: ColorInt
+    var border_color: ColorInt
+    var border_width: Int32
+    var is_focused: Bool
+
     var nodes: List[TreeNode]
     var root_nodes: List[Int32]  # Root level node IDs
     var next_node_id: Int32
@@ -113,9 +122,16 @@ struct TreeViewInt(BaseWidgetInt):
     var multi_select: Bool
     var selected_nodes: List[Int32]
     
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32, height: Int32):
-        self.super().__init__(x, y, width, height)
-        
+    fn __init__(out self, x: Int32, y: Int32, width: Int32, height: Int32):
+        # Inlined BaseWidgetInt.__init__
+        self.bounds = RectInt(x, y, width, height)
+        self.visible = True
+        self.enabled = True
+        self.background_color = ColorInt(230, 230, 230, 255)
+        self.border_color = ColorInt(128, 128, 128, 255)
+        self.border_width = 1
+        self.is_focused = False
+
         self.nodes = List[TreeNode]()
         self.root_nodes = List[Int32]()
         self.next_node_id = 0
@@ -143,7 +159,7 @@ struct TreeViewInt(BaseWidgetInt):
         self.max_width = 0
         
         # Colors using theme system
-        let theme = get_theme()
+        var theme = get_theme()
         self.text_color = theme.primary_text
         self.selected_bg_color = theme.selection_bg
         self.selected_text_color = theme.selection_text
@@ -162,8 +178,43 @@ struct TreeViewInt(BaseWidgetInt):
         self.background_color = theme.primary_bg
         self.border_color = theme.primary_border
         self.border_width = 1
-    
-    fn add_node(inout self, text: String, parent_id: Int32 = -1, 
+
+    # Inlined BaseWidgetInt methods (struct inheritance is not supported).
+    fn get_bounds(self) -> RectInt:
+        return self.bounds
+
+    fn set_bounds(mut self, bounds: RectInt):
+        self.bounds = bounds
+
+    fn is_visible(self) -> Bool:
+        return self.visible
+
+    fn set_visible(mut self, visible: Bool):
+        self.visible = visible
+
+    fn is_enabled(self) -> Bool:
+        return self.enabled
+
+    fn set_enabled(mut self, enabled: Bool):
+        self.enabled = enabled
+
+    fn contains_point(self, point: PointInt) -> Bool:
+        return self.bounds.contains(point)
+
+    fn render_background(self, ctx: RenderingContextInt):
+        if not self.visible:
+            return
+        _ = ctx.set_color(self.background_color.r, self.background_color.g,
+                          self.background_color.b, self.background_color.a)
+        _ = ctx.draw_filled_rectangle(self.bounds.x, self.bounds.y,
+                                      self.bounds.width, self.bounds.height)
+        if self.border_width > 0:
+            _ = ctx.set_color(self.border_color.r, self.border_color.g,
+                              self.border_color.b, self.border_color.a)
+            _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
+                                   self.bounds.width, self.bounds.height)
+
+    fn add_node(mut self, text: String, parent_id: Int32 = -1,
                 node_type: Int32 = NODE_FOLDER) -> Int32:
         """Add a new node to the tree."""
         var node = TreeNode(self.next_node_id, text, node_type)
@@ -171,7 +222,7 @@ struct TreeViewInt(BaseWidgetInt):
         
         # Set level based on parent
         if parent_id >= 0:
-            let parent_idx = self.find_node_index(parent_id)
+            var parent_idx = self.find_node_index(parent_id)
             if parent_idx >= 0:
                 node.level = self.nodes[parent_idx].level + 1
                 self.nodes[parent_idx].add_child(node.id)
@@ -195,33 +246,33 @@ struct TreeViewInt(BaseWidgetInt):
         self.update_visible_nodes()
         return node.id
     
-    fn remove_node(inout self, node_id: Int32):
+    fn remove_node(mut self, node_id: Int32):
         """Remove a node and all its children."""
-        let node_idx = self.find_node_index(node_id)
+        var node_idx = self.find_node_index(node_id)
         if node_idx < 0:
             return
         
-        let node = self.nodes[node_idx]
+        var node = self.nodes[node_idx].copy()
         
         # Remove from parent's children
         if node.parent_id >= 0:
-            let parent_idx = self.find_node_index(node.parent_id)
+            var parent_idx = self.find_node_index(node.parent_id)
             if parent_idx >= 0:
                 self.nodes[parent_idx].remove_child(node_id)
         else:
             # Remove from root nodes
             for i in range(len(self.root_nodes)):
                 if self.root_nodes[i] == node_id:
-                    self.root_nodes.remove(i)
+                    _ = self.root_nodes.pop(i)
                     break
         
         # Remove all children recursively
-        let children = node.children.copy()  # Copy to avoid modification during iteration
+        var children = node.children.copy()  # Copy to avoid modification during iteration
         for child_id in children:
             self.remove_node(child_id)
         
         # Remove the node itself
-        self.nodes.remove(node_idx)
+        _ = self.nodes.pop(node_idx)
         
         # Update selection if needed
         if self.selected_node == node_id:
@@ -229,9 +280,9 @@ struct TreeViewInt(BaseWidgetInt):
         
         self.update_visible_nodes()
     
-    fn expand_node(inout self, node_id: Int32, expand: Bool = True):
+    fn expand_node(mut self, node_id: Int32, expand: Bool = True):
         """Expand or collapse a node."""
-        let node_idx = self.find_node_index(node_id)
+        var node_idx = self.find_node_index(node_id)
         if node_idx < 0:
             return
         
@@ -242,28 +293,28 @@ struct TreeViewInt(BaseWidgetInt):
         
         self.update_visible_nodes()
     
-    fn expand_all(inout self):
+    fn expand_all(mut self):
         """Expand all nodes."""
         for i in range(len(self.nodes)):
             if self.nodes[i].has_children():
                 self.nodes[i].state = NODE_EXPANDED
         self.update_visible_nodes()
     
-    fn collapse_all(inout self):
+    fn collapse_all(mut self):
         """Collapse all nodes."""
         for i in range(len(self.nodes)):
             if self.nodes[i].has_children():
                 self.nodes[i].state = NODE_COLLAPSED
         self.update_visible_nodes()
     
-    fn select_node(inout self, node_id: Int32):
+    fn select_node(mut self, node_id: Int32):
         """Select a node."""
         if self.multi_select:
             # Toggle selection in multi-select mode
             var found = False
             for i in range(len(self.selected_nodes)):
                 if self.selected_nodes[i] == node_id:
-                    self.selected_nodes.remove(i)
+                    _ = self.selected_nodes.pop(i)
                     found = True
                     break
             
@@ -296,15 +347,15 @@ struct TreeViewInt(BaseWidgetInt):
         if not self.contains_point(point):
             return -1
         
-        let y_offset = point.y - self.bounds.y - self.scroll_offset
-        let row = y_offset // self.row_height
+        var y_offset = point.y - self.bounds.y - self.scroll_offset
+        var row = y_offset // self.row_height
         
         if row >= 0 and row < len(self.visible_nodes):
             return self.visible_nodes[row]
         
         return -1
     
-    fn update_visible_nodes(inout self):
+    fn update_visible_nodes(mut self):
         """Update list of visible nodes based on expansion state."""
         self.visible_nodes.clear()
         self.content_height = 0
@@ -315,17 +366,17 @@ struct TreeViewInt(BaseWidgetInt):
             self.add_visible_node_recursive(root_id)
         
         # Update scrollbar
-        let visible_height = self.bounds.height - 15  # Minus scrollbar
-        self.v_scrollbar.set_range(0, max(0, self.content_height - visible_height))
+        var visible_height = self.bounds.height - 15  # Minus scrollbar
+        self.v_scrollbar.set_range(0, max(Int32(0), self.content_height - visible_height))
         self.v_scrollbar.set_page_size(visible_height // self.row_height)
     
-    fn add_visible_node_recursive(inout self, node_id: Int32):
+    fn add_visible_node_recursive(mut self, node_id: Int32):
         """Recursively add visible nodes."""
-        let node_idx = self.find_node_index(node_id)
+        var node_idx = self.find_node_index(node_id)
         if node_idx < 0:
             return
         
-        let node = self.nodes[node_idx]
+        var node = self.nodes[node_idx].copy()
         if not node.is_visible:
             return
         
@@ -334,10 +385,10 @@ struct TreeViewInt(BaseWidgetInt):
         self.content_height += self.row_height
         
         # Calculate width
-        let node_width = node.level * self.indent_width + 
+        var node_width = (node.level * self.indent_width +
                         self.expand_icon_size + 8 +
                         (self.icon_size + 4 if self.show_icons else 0) +
-                        len(node.text) * 7  # Approximate text width
+                        Int32(len(node.text)) * 7)  # Approximate text width
         self.max_width = max(self.max_width, node_width)
         
         # Add children if expanded
@@ -345,7 +396,7 @@ struct TreeViewInt(BaseWidgetInt):
             for child_id in node.children:
                 self.add_visible_node_recursive(child_id)
     
-    fn handle_mouse_event(inout self, event: MouseEventInt) -> Bool:
+    fn handle_mouse_event(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse events."""
         if not self.visible or not self.enabled:
             return False
@@ -358,21 +409,21 @@ struct TreeViewInt(BaseWidgetInt):
         if self.h_scrollbar.handle_mouse_event(event):
             return True
         
-        let point = PointInt(event.x, event.y)
+        var point = PointInt(event.x, event.y)
         if not self.contains_point(point):
             return False
         
-        let node_id = self.get_node_at_point(point)
+        var node_id = self.get_node_at_point(point)
         
         if event.pressed:
             if node_id >= 0:
-                let node_idx = self.find_node_index(node_id)
+                var node_idx = self.find_node_index(node_id)
                 if node_idx >= 0:
-                    let node = self.nodes[node_idx]
+                    var node = self.nodes[node_idx].copy()
                     
                     # Check if clicking on expand/collapse icon
-                    let icon_x = self.bounds.x + node.level * self.indent_width + 4
-                    let icon_rect = RectInt(icon_x, 
+                    var icon_x = self.bounds.x + node.level * self.indent_width + 4
+                    var icon_rect = RectInt(icon_x, 
                                            self.bounds.y + self.get_node_y(node_id) - self.scroll_offset,
                                            self.expand_icon_size, self.row_height)
                     
@@ -409,25 +460,25 @@ struct TreeViewInt(BaseWidgetInt):
         
         return True
     
-    fn handle_drop(inout self, source_id: Int32, target_id: Int32):
+    fn handle_drop(mut self, source_id: Int32, target_id: Int32):
         """Handle drop operation."""
         # Implementation would move source node to target
         # This is simplified - real implementation would validate the move
-        let source_idx = self.find_node_index(source_id)
-        let target_idx = self.find_node_index(target_id)
+        var source_idx = self.find_node_index(source_id)
+        var target_idx = self.find_node_index(target_id)
         
         if source_idx >= 0 and target_idx >= 0:
             # Remove from old parent
-            let source_node = self.nodes[source_idx]
+            var source_node = self.nodes[source_idx].copy()
             if source_node.parent_id >= 0:
-                let old_parent_idx = self.find_node_index(source_node.parent_id)
+                var old_parent_idx = self.find_node_index(source_node.parent_id)
                 if old_parent_idx >= 0:
                     self.nodes[old_parent_idx].remove_child(source_id)
             else:
                 # Remove from root
                 for i in range(len(self.root_nodes)):
                     if self.root_nodes[i] == source_id:
-                        self.root_nodes.remove(i)
+                        _ = self.root_nodes.pop(i)
                         break
             
             # Add to new parent
@@ -440,17 +491,17 @@ struct TreeViewInt(BaseWidgetInt):
             
             self.update_visible_nodes()
     
-    fn update_node_levels_recursive(inout self, node_id: Int32):
+    fn update_node_levels_recursive(mut self, node_id: Int32):
         """Update node levels recursively."""
-        let node_idx = self.find_node_index(node_id)
+        var node_idx = self.find_node_index(node_id)
         if node_idx < 0:
             return
         
-        let node = self.nodes[node_idx]
+        var node = self.nodes[node_idx].copy()
         
         # Update children
         for child_id in node.children:
-            let child_idx = self.find_node_index(child_id)
+            var child_idx = self.find_node_index(child_id)
             if child_idx >= 0:
                 self.nodes[child_idx].level = node.level + 1
                 self.update_node_levels_recursive(child_id)
@@ -466,7 +517,7 @@ struct TreeViewInt(BaseWidgetInt):
         """Check if drag and drop is enabled."""
         return True  # Could be made configurable
     
-    fn handle_key_event(inout self, event: KeyEventInt) -> Bool:
+    fn handle_key_event(mut self, event: KeyEventInt) -> Bool:
         """Handle keyboard navigation."""
         if not self.visible or not self.enabled or not self.is_focused:
             return False
@@ -479,7 +530,7 @@ struct TreeViewInt(BaseWidgetInt):
             self.select_node(self.visible_nodes[0])
             return True
         
-        let selected_idx = -1
+        var selected_idx = -1
         for i in range(len(self.visible_nodes)):
             if self.visible_nodes[i] == self.selected_node:
                 selected_idx = i
@@ -502,9 +553,9 @@ struct TreeViewInt(BaseWidgetInt):
             return True
         elif event.key_code == KEY_LEFT:
             # Collapse node or move to parent
-            let node_idx = self.find_node_index(self.selected_node)
+            var node_idx = self.find_node_index(self.selected_node)
             if node_idx >= 0:
-                let node = self.nodes[node_idx]
+                var node = self.nodes[node_idx].copy()
                 if node.is_expanded() and node.has_children():
                     self.expand_node(self.selected_node, False)
                 elif node.parent_id >= 0:
@@ -513,9 +564,9 @@ struct TreeViewInt(BaseWidgetInt):
             return True
         elif event.key_code == KEY_RIGHT:
             # Expand node or move to first child
-            let node_idx = self.find_node_index(self.selected_node)
+            var node_idx = self.find_node_index(self.selected_node)
             if node_idx >= 0:
-                let node = self.nodes[node_idx]
+                var node = self.nodes[node_idx].copy()
                 if not node.is_expanded() and node.has_children():
                     self.expand_node(self.selected_node, True)
                 elif node.is_expanded() and len(node.children) > 0:
@@ -524,20 +575,20 @@ struct TreeViewInt(BaseWidgetInt):
             return True
         elif event.key_code == KEY_ENTER or event.key_code == KEY_SPACE:
             # Toggle expansion
-            let node_idx = self.find_node_index(self.selected_node)
+            var node_idx = self.find_node_index(self.selected_node)
             if node_idx >= 0:
-                let node = self.nodes[node_idx]
+                var node = self.nodes[node_idx].copy()
                 if node.has_children():
                     self.expand_node(self.selected_node, not node.is_expanded())
             return True
         
         return False
     
-    fn ensure_node_visible(inout self, node_id: Int32):
+    fn ensure_node_visible(mut self, node_id: Int32):
         """Ensure node is visible by scrolling if needed."""
-        let y = self.get_node_y(node_id)
-        let visible_start = self.scroll_offset
-        let visible_end = self.scroll_offset + self.bounds.height - 15
+        var y = self.get_node_y(node_id)
+        var visible_start = self.scroll_offset
+        var visible_end = self.scroll_offset + self.bounds.height - 15
         
         if y < visible_start:
             self.scroll_offset = y
@@ -558,13 +609,13 @@ struct TreeViewInt(BaseWidgetInt):
                                      self.bounds.width, self.bounds.height)
         
         # Set clipping area (would need proper clipping support)
-        let content_width = self.bounds.width - 15
-        let content_height = self.bounds.height - 15
+        var content_width = self.bounds.width - 15
+        var content_height = self.bounds.height - 15
         
         # Render visible nodes
-        let start_row = self.scroll_offset // self.row_height
-        let end_row = min(start_row + content_height // self.row_height + 1, 
-                         len(self.visible_nodes))
+        var start_row = self.scroll_offset // self.row_height
+        var end_row = min(start_row + content_height // self.row_height + 1,
+                         Int32(len(self.visible_nodes)))
         
         for i in range(start_row, end_row):
             if i < len(self.visible_nodes):
@@ -587,13 +638,13 @@ struct TreeViewInt(BaseWidgetInt):
     
     fn render_node(self, ctx: RenderingContextInt, node_id: Int32, row: Int32):
         """Render a single node."""
-        let node_idx = self.find_node_index(node_id)
+        var node_idx = self.find_node_index(node_id)
         if node_idx < 0:
             return
         
-        let node = self.nodes[node_idx]
-        let y = self.bounds.y + row * self.row_height
-        let x = self.bounds.x + node.level * self.indent_width
+        var node = self.nodes[node_idx].copy()
+        var y = self.bounds.y + row * self.row_height
+        var x = self.bounds.x + node.level * self.indent_width
         
         # Selection/hover background
         if node.is_selected:
@@ -621,7 +672,7 @@ struct TreeViewInt(BaseWidgetInt):
             content_x += self.icon_size + 4
         
         # Node text
-        let text_color = self.selected_text_color if node.is_selected else self.text_color
+        var text_color = self.selected_text_color if node.is_selected else self.text_color
         _ = ctx.set_color(text_color.r, text_color.g, text_color.b, text_color.a)
         _ = ctx.draw_text(node.text, content_x, y + (self.row_height - self.font_size) // 2, self.font_size)
     
@@ -675,31 +726,31 @@ struct TreeViewInt(BaseWidgetInt):
     
     fn render_drop_indicator(self, ctx: RenderingContextInt, target_node_id: Int32):
         """Render drop indicator during drag operation."""
-        let y = self.bounds.y + self.get_node_y(target_node_id) - self.scroll_offset
+        var y = self.bounds.y + self.get_node_y(target_node_id) - self.scroll_offset
         
         _ = ctx.set_color(51, 153, 255, 128)  # Semi-transparent blue
         _ = ctx.draw_filled_rectangle(self.bounds.x, y - 1, self.bounds.width - 15, 3)
     
-    fn update(inout self):
+    fn update(mut self):
         """Update tree view state."""
         self.v_scrollbar.update()
         self.h_scrollbar.update()
 
 # Icon types for common use
-alias ICON_FOLDER = "folder"
-alias ICON_FOLDER_OPEN = "folder_open"
-alias ICON_FILE = "file"
-alias ICON_FILE_TEXT = "file_text"
-alias ICON_FILE_IMAGE = "file_image"
-alias ICON_FILE_CODE = "file_code"
-alias ICON_HOME = "home"
-alias ICON_STAR = "star"
-alias ICON_TRASH = "trash"
-alias ICON_DESKTOP = "desktop"
-alias ICON_DOWNLOAD = "download"
-alias ICON_MUSIC = "music"
-alias ICON_VIDEO = "video"
-alias ICON_PICTURE = "picture"
+comptime ICON_FOLDER = "folder"
+comptime ICON_FOLDER_OPEN = "folder_open"
+comptime ICON_FILE = "file"
+comptime ICON_FILE_TEXT = "file_text"
+comptime ICON_FILE_IMAGE = "file_image"
+comptime ICON_FILE_CODE = "file_code"
+comptime ICON_HOME = "home"
+comptime ICON_STAR = "star"
+comptime ICON_TRASH = "trash"
+comptime ICON_DESKTOP = "desktop"
+comptime ICON_DOWNLOAD = "download"
+comptime ICON_MUSIC = "music"
+comptime ICON_VIDEO = "video"
+comptime ICON_PICTURE = "picture"
 
 # Convenience functions
 fn create_tree_view_int(x: Int32, y: Int32, width: Int32, height: Int32) -> TreeViewInt:
@@ -712,4 +763,4 @@ fn create_file_tree_int(x: Int32, y: Int32, width: Int32, height: Int32) -> Tree
     tree.show_icons = True
     tree.show_lines = False
     tree.indent_width = 16
-    return tree
+    return tree^

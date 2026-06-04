@@ -7,12 +7,12 @@ from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, Re
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
 
 # Toolbar button types
-alias TOOLBAR_BUTTON = 0
-alias TOOLBAR_TOGGLE = 1
-alias TOOLBAR_DROPDOWN = 2
-alias TOOLBAR_SEPARATOR = 3
+comptime TOOLBAR_BUTTON = 0
+comptime TOOLBAR_TOGGLE = 1
+comptime TOOLBAR_DROPDOWN = 2
+comptime TOOLBAR_SEPARATOR = 3
 
-struct ToolbarItem:
+struct ToolbarItem(Copyable, Movable):
     """Individual toolbar item."""
     var item_type: Int32
     var text: String
@@ -23,8 +23,8 @@ struct ToolbarItem:
     var toggled: Bool
     var dropdown_items: List[String]
     var data: Int32
-    
-    fn __init__(inout self, item_type: Int32, text: String, tooltip: String = ""):
+
+    fn __init__(out self, item_type: Int32, text: String, tooltip: String = ""):
         self.item_type = item_type
         self.text = text
         self.icon = ""
@@ -35,9 +35,17 @@ struct ToolbarItem:
         self.dropdown_items = List[String]()
         self.data = 0
 
-struct ToolBarInt(BaseWidgetInt):
+struct ToolBarInt(Copyable, Movable):
     """Toolbar with button groups, separators, and overflow handling."""
-    
+
+    # Inlined BaseWidgetInt fields (struct inheritance is not supported).
+    var bounds: RectInt
+    var visible: Bool
+    var enabled: Bool
+    var background_color: ColorInt
+    var border_color: ColorInt
+    var border_width: Int32
+
     var items: List[ToolbarItem]
     var button_height: Int32
     var button_padding: Int32
@@ -59,8 +67,14 @@ struct ToolBarInt(BaseWidgetInt):
     var text_color: ColorInt
     var disabled_color: ColorInt
     
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32, height: Int32):
-        self.super().__init__(x, y, width, height)
+    fn __init__(out self, x: Int32, y: Int32, width: Int32, height: Int32):
+        # Inlined BaseWidgetInt.__init__
+        self.bounds = RectInt(x, y, width, height)
+        self.visible = True
+        self.enabled = True
+        self.background_color = ColorInt(230, 230, 230, 255)
+        self.border_color = ColorInt(128, 128, 128, 255)
+        self.border_width = 1
         self.items = List[ToolbarItem]()
         self.button_height = height - 4
         self.button_padding = 8
@@ -86,34 +100,69 @@ struct ToolBarInt(BaseWidgetInt):
         self.background_color = ColorInt(245, 245, 245, 255)
         self.border_color = ColorInt(180, 180, 180, 255)
         self.border_width = 1
-    
-    fn add_button(inout self, text: String, tooltip: String = ""):
+
+    # Inlined BaseWidgetInt methods (struct inheritance is not supported).
+    fn get_bounds(self) -> RectInt:
+        return self.bounds
+
+    fn set_bounds(mut self, bounds: RectInt):
+        self.bounds = bounds
+
+    fn is_visible(self) -> Bool:
+        return self.visible
+
+    fn set_visible(mut self, visible: Bool):
+        self.visible = visible
+
+    fn is_enabled(self) -> Bool:
+        return self.enabled
+
+    fn set_enabled(mut self, enabled: Bool):
+        self.enabled = enabled
+
+    fn contains_point(self, point: PointInt) -> Bool:
+        return self.bounds.contains(point)
+
+    fn render_background(self, ctx: RenderingContextInt):
+        if not self.visible:
+            return
+        _ = ctx.set_color(self.background_color.r, self.background_color.g,
+                          self.background_color.b, self.background_color.a)
+        _ = ctx.draw_filled_rectangle(self.bounds.x, self.bounds.y,
+                                      self.bounds.width, self.bounds.height)
+        if self.border_width > 0:
+            _ = ctx.set_color(self.border_color.r, self.border_color.g,
+                              self.border_color.b, self.border_color.a)
+            _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
+                                   self.bounds.width, self.bounds.height)
+
+    fn add_button(mut self, text: String, tooltip: String = ""):
         """Add a regular button."""
         var item = ToolbarItem(TOOLBAR_BUTTON, text, tooltip)
         self.calculate_item_width(item)
         self.items.append(item)
     
-    fn add_toggle(inout self, text: String, tooltip: String = "", toggled: Bool = False):
+    fn add_toggle(mut self, text: String, tooltip: String = "", toggled: Bool = False):
         """Add a toggle button."""
         var item = ToolbarItem(TOOLBAR_TOGGLE, text, tooltip)
         item.toggled = toggled
         self.calculate_item_width(item)
         self.items.append(item)
     
-    fn add_dropdown(inout self, text: String, dropdown_items: List[String], tooltip: String = ""):
+    fn add_dropdown(mut self, text: String, dropdown_items: List[String], tooltip: String = ""):
         """Add a dropdown button."""
         var item = ToolbarItem(TOOLBAR_DROPDOWN, text, tooltip)
         item.dropdown_items = dropdown_items
         self.calculate_item_width(item)
         self.items.append(item)
     
-    fn add_separator(inout self):
+    fn add_separator(mut self):
         """Add a separator."""
         var item = ToolbarItem(TOOLBAR_SEPARATOR, "", "")
         item.width = self.separator_width
         self.items.append(item)
     
-    fn calculate_item_width(inout self, item: ToolbarItem):
+    fn calculate_item_width(mut self, mut item: ToolbarItem):
         """Calculate width for a toolbar item."""
         if item.item_type == TOOLBAR_SEPARATOR:
             item.width = self.separator_width
@@ -135,10 +184,10 @@ struct ToolBarInt(BaseWidgetInt):
         
         item.width = width
     
-    fn calculate_overflow(inout self):
+    fn calculate_overflow(mut self):
         """Calculate which items go into overflow menu."""
-        var x = self.x + 2
-        var max_x = self.x + self.width - 30  # Space for overflow button
+        var x = self.bounds.x + 2
+        var max_x = self.bounds.x + self.bounds.width - 30  # Space for overflow button
         
         self.overflow_start = -1
         
@@ -156,19 +205,19 @@ struct ToolBarInt(BaseWidgetInt):
         if self.overflow_start >= 0 and index >= self.overflow_start:
             return RectInt(0, 0, 0, 0)  # In overflow menu
         
-        var x = self.x + 2
+        var x = self.bounds.x + 2
         for i in range(index):
             x += self.items[i].width + 2
-        
-        return RectInt(x, self.y + 2, self.items[index].width, self.button_height)
+
+        return RectInt(x, self.bounds.y + 2, self.items[index].width, self.button_height)
     
-    fn handle_mouse_event(inout self, event: MouseEventInt) -> Bool:
+    fn handle_mouse_event(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse events."""
         if not self.visible or not self.enabled:
             return False
-        
+
         var point = PointInt(event.x, event.y)
-        if not self._point_in_bounds(point):
+        if not self.contains_point(point):
             self.hover_item = -1
             return False
         
@@ -195,7 +244,7 @@ struct ToolBarInt(BaseWidgetInt):
         self.hover_item = -1
         return True
     
-    fn draw(self, ctx: RenderingContextInt):
+    fn draw(mut self, ctx: RenderingContextInt):
         """Render toolbar."""
         if not self.visible:
             return
@@ -203,9 +252,9 @@ struct ToolBarInt(BaseWidgetInt):
         # Background
         _ = ctx.set_color(self.background_color.r, self.background_color.g,
                          self.background_color.b, self.background_color.a)
-        _ = ctx.draw_filled_rectangle(self.x, self.y,
-                                     self.width, self.height)
-        
+        _ = ctx.draw_filled_rectangle(self.bounds.x, self.bounds.y,
+                                     self.bounds.width, self.bounds.height)
+
         # Calculate overflow
         self.calculate_overflow()
         
@@ -222,9 +271,9 @@ struct ToolBarInt(BaseWidgetInt):
         # Border
         _ = ctx.set_color(self.border_color.r, self.border_color.g,
                          self.border_color.b, self.border_color.a)
-        _ = ctx.draw_rectangle(self.x, self.y,
-                              self.width, self.height)
-        
+        _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
+                              self.bounds.width, self.bounds.height)
+
         # Render open dropdown
         if self.dropdown_open >= 0:
             self.render_dropdown(ctx, self.dropdown_open)
@@ -292,8 +341,8 @@ struct ToolBarInt(BaseWidgetInt):
     
     fn render_overflow_button(self, ctx: RenderingContextInt):
         """Render overflow menu button."""
-        var x = self.x + self.width - 25
-        var y = self.y + 2
+        var x = self.bounds.x + self.bounds.width - 25
+        var y = self.bounds.y + 2
         var w = 20
         var h = self.button_height
         
@@ -351,7 +400,7 @@ struct ToolBarInt(BaseWidgetInt):
                          self.border_color.b, self.border_color.a)
         _ = ctx.draw_rectangle(menu_x, menu_y, menu_width, menu_height)
     
-    fn update(inout self):
+    fn update(mut self):
         """Update toolbar state."""
         # Reset pressed state after release
         if self.pressed_item >= 0:
@@ -362,7 +411,7 @@ struct ToolBarInt(BaseWidgetInt):
         """Get number of toolbar items."""
         return len(self.items)
     
-    fn set_item_enabled(inout self, index: Int32, enabled: Bool):
+    fn set_item_enabled(mut self, index: Int32, enabled: Bool):
         """Enable or disable a toolbar item."""
         if index >= 0 and index < len(self.items):
             self.items[index].enabled = enabled
@@ -373,20 +422,26 @@ struct ToolBarInt(BaseWidgetInt):
             return self.items[index].toggled
         return False
     
-    fn set_item_toggled(inout self, index: Int32, toggled: Bool):
+    fn set_item_toggled(mut self, index: Int32, toggled: Bool):
         """Set toggle state of item."""
         if index >= 0 and index < len(self.items):
             if self.items[index].item_type == TOOLBAR_TOGGLE:
                 self.items[index].toggled = toggled
     
-    fn set_display_options(inout self, show_icons: Bool, show_text: Bool):
+    fn set_display_options(mut self, show_icons: Bool, show_text: Bool):
         """Set what to display on toolbar items."""
         self.show_icons = show_icons
         self.show_text = show_text
-        
+
         # Recalculate item widths
         for i in range(len(self.items)):
-            self.calculate_item_width(self.items[i])
+            var item = self.items[i]
+            self.calculate_item_width(item)
+            self.items[i] = item^
+
+    fn handle_key_event(mut self, event: KeyEventInt) -> Bool:
+        """Handle key events (not typically used)."""
+        return False
 
 
 # Convenience functions

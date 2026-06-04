@@ -9,37 +9,37 @@ from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
 from .widget_constants import *
 
 # Port types
-alias PORT_INPUT = 0
-alias PORT_OUTPUT = 1
+comptime PORT_INPUT = 0
+comptime PORT_OUTPUT = 1
 
 # Field types
-alias FIELD_TEXT = 0
-alias FIELD_NUMBER = 1
-alias FIELD_SELECT = 2
-alias FIELD_FILEPATH = 3
+comptime FIELD_TEXT = 0
+comptime FIELD_NUMBER = 1
+comptime FIELD_SELECT = 2
+comptime FIELD_FILEPATH = 3
 
 # Interaction modes
-alias INTERACT_NONE = 0
-alias INTERACT_NODE_DRAG = 1
-alias INTERACT_NODE_RESIZE = 2
-alias INTERACT_LINK_DRAG = 3
-alias INTERACT_PAN = 4
-alias INTERACT_MARQUEE = 5
+comptime INTERACT_NONE = 0
+comptime INTERACT_NODE_DRAG = 1
+comptime INTERACT_NODE_RESIZE = 2
+comptime INTERACT_LINK_DRAG = 3
+comptime INTERACT_PAN = 4
+comptime INTERACT_MARQUEE = 5
 
-struct PortInt:
+struct PortInt(Copyable, Movable):
     """Node port for connections."""
     var id: Int32
     var label: String
     var is_input: Bool
     var port_type: Int32  # For type validation
 
-    fn __init__(inout self, id: Int32, label: String, is_input: Bool):
+    fn __init__(out self, id: Int32, label: String, is_input: Bool):
         self.id = id
         self.label = label
         self.is_input = is_input
         self.port_type = 0
 
-struct FieldInt:
+struct FieldInt(Copyable, Movable):
     """Editable field within a node."""
     var id: Int32
     var label: String
@@ -52,7 +52,7 @@ struct FieldInt:
     var max_val: Int32
     var step: Int32
 
-    fn __init__(inout self, id: Int32, label: String, kind: Int32 = FIELD_TEXT):
+    fn __init__(out self, id: Int32, label: String, kind: Int32 = FIELD_TEXT):
         self.id = id
         self.label = label
         self.kind = kind
@@ -64,7 +64,7 @@ struct FieldInt:
         self.max_val = 100
         self.step = 1
 
-struct NodeInt:
+struct NodeInt(Copyable, Movable):
     """A node in the graph."""
     var id: Int32
     var title: String
@@ -79,7 +79,7 @@ struct NodeInt:
     var collapsed: Bool
     var color: ColorInt
 
-    fn __init__(inout self, id: Int32, title: String, x: Int32, y: Int32):
+    fn __init__(out self, id: Int32, title: String, x: Int32, y: Int32):
         self.id = id
         self.title = title
         self.x = x
@@ -93,19 +93,19 @@ struct NodeInt:
         self.collapsed = False
         self.color = ColorInt(80, 100, 140, 255)
 
-    fn add_input(inout self, id: Int32, label: String):
+    fn add_input(mut self, id: Int32, label: String):
         self.inputs.append(PortInt(id, label, True))
         self._recalculate_height()
 
-    fn add_output(inout self, id: Int32, label: String):
+    fn add_output(mut self, id: Int32, label: String):
         self.outputs.append(PortInt(id, label, False))
         self._recalculate_height()
 
-    fn add_field(inout self, field: FieldInt):
+    fn add_field(mut self, field: FieldInt):
         self.fields.append(field)
         self._recalculate_height()
 
-    fn _recalculate_height(inout self):
+    fn _recalculate_height(mut self):
         """Recalculate node height based on content."""
         var header_height = 28
         var port_height = 20
@@ -115,35 +115,45 @@ struct NodeInt:
         var ports_height = max(len(self.inputs), len(self.outputs)) * port_height
         var fields_height = len(self.fields) * field_height
 
-        self.height = header_height + ports_height + fields_height + padding * 2
+        self.height = Int32(header_height + ports_height + fields_height + padding * 2)
 
-struct EdgeInt:
+struct EdgeInt(Copyable, Movable):
     """Connection between two ports."""
     var from_node: Int32
     var from_port: Int32
     var to_node: Int32
     var to_port: Int32
 
-    fn __init__(inout self, from_node: Int32, from_port: Int32,
+    fn __init__(out self, from_node: Int32, from_port: Int32,
                 to_node: Int32, to_port: Int32):
         self.from_node = from_node
         self.from_port = from_port
         self.to_node = to_node
         self.to_port = to_port
 
-struct PortRef:
+struct PortRef(Copyable, Movable):
     """Reference to a specific port."""
     var node_id: Int32
     var port_id: Int32
     var is_input: Bool
 
-    fn __init__(inout self, node_id: Int32, port_id: Int32, is_input: Bool):
+    fn __init__(out self, node_id: Int32, port_id: Int32, is_input: Bool):
         self.node_id = node_id
         self.port_id = port_id
         self.is_input = is_input
 
-struct NodeGraphInt(BaseWidgetInt):
+struct NodeGraphInt(Copyable, Movable):
     """Visual node graph editor widget."""
+
+    # Widget identity / geometry (this widget uses x/y/width/height directly,
+    # not BaseWidgetInt's RectInt bounds, so the base fields are inlined here).
+    var id: Int32
+    var x: Int32
+    var y: Int32
+    var width: Int32
+    var height: Int32
+    var visible: Bool
+    var enabled: Bool
 
     # Graph data
     var nodes: List[NodeInt]
@@ -190,7 +200,7 @@ struct NodeGraphInt(BaseWidgetInt):
     var edge_color: ColorInt
     var text_color: ColorInt
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.id = 0
         self.x = 0
         self.y = 0
@@ -239,7 +249,7 @@ struct NodeGraphInt(BaseWidgetInt):
         self.edge_color = ColorInt(140, 160, 200, 255)
         self.text_color = ColorInt(220, 225, 235, 255)
 
-    fn add_node(inout self, title: String, x: Int32, y: Int32) -> Int32:
+    fn add_node(mut self, title: String, x: Int32, y: Int32) -> Int32:
         """Add a new node and return its ID."""
         var node = NodeInt(self.next_node_id, title, x, y)
         var node_id = self.next_node_id
@@ -247,7 +257,7 @@ struct NodeGraphInt(BaseWidgetInt):
         self.nodes.append(node)
         return node_id
 
-    fn add_node_input(inout self, node_id: Int32, label: String) -> Int32:
+    fn add_node_input(mut self, node_id: Int32, label: String) -> Int32:
         """Add an input port to a node."""
         for i in range(len(self.nodes)):
             if self.nodes[i].id == node_id:
@@ -257,7 +267,7 @@ struct NodeGraphInt(BaseWidgetInt):
                 return port_id
         return -1
 
-    fn add_node_output(inout self, node_id: Int32, label: String) -> Int32:
+    fn add_node_output(mut self, node_id: Int32, label: String) -> Int32:
         """Add an output port to a node."""
         for i in range(len(self.nodes)):
             if self.nodes[i].id == node_id:
@@ -267,7 +277,7 @@ struct NodeGraphInt(BaseWidgetInt):
                 return port_id
         return -1
 
-    fn add_node_field(inout self, node_id: Int32, label: String,
+    fn add_node_field(mut self, node_id: Int32, label: String,
                       kind: Int32 = FIELD_TEXT) -> Int32:
         """Add a field to a node."""
         for i in range(len(self.nodes)):
@@ -279,7 +289,7 @@ struct NodeGraphInt(BaseWidgetInt):
                 return field_id
         return -1
 
-    fn connect(inout self, from_node: Int32, from_port: Int32,
+    fn connect(mut self, from_node: Int32, from_port: Int32,
                to_node: Int32, to_port: Int32) -> Bool:
         """Connect two ports with an edge."""
         # Validate connection
@@ -296,7 +306,7 @@ struct NodeGraphInt(BaseWidgetInt):
         self.edges.append(EdgeInt(from_node, from_port, to_node, to_port))
         return True
 
-    fn disconnect(inout self, edge_index: Int32):
+    fn disconnect(mut self, edge_index: Int32):
         """Remove an edge by index."""
         if edge_index >= 0 and edge_index < len(self.edges):
             # Remove edge at index (swap with last and pop)
@@ -305,7 +315,7 @@ struct NodeGraphInt(BaseWidgetInt):
                 self.edges[edge_index] = self.edges[last]
             _ = self.edges.pop()
 
-    fn delete_selected_nodes(inout self):
+    fn delete_selected_nodes(mut self):
         """Delete all selected nodes and their edges."""
         # Remove edges connected to selected nodes
         var i = len(self.edges) - 1
@@ -341,17 +351,17 @@ struct NodeGraphInt(BaseWidgetInt):
 
         self.selected_nodes.clear()
 
-    fn screen_to_world(self, screen_x: Int32, screen_y: Int32) -> (Int32, Int32):
+    fn screen_to_world(self, screen_x: Int32, screen_y: Int32) -> Tuple[Int32, Int32]:
         """Convert screen coordinates to world coordinates."""
         var world_x = (screen_x - self.x - self.pan_x) * 100 // self.zoom
         var world_y = (screen_y - self.y - self.pan_y) * 100 // self.zoom
-        return (world_x, world_y)
+        return Tuple[Int32, Int32](world_x, world_y)
 
-    fn world_to_screen(self, world_x: Int32, world_y: Int32) -> (Int32, Int32):
+    fn world_to_screen(self, world_x: Int32, world_y: Int32) -> Tuple[Int32, Int32]:
         """Convert world coordinates to screen coordinates."""
         var screen_x = world_x * self.zoom // 100 + self.pan_x + self.x
         var screen_y = world_y * self.zoom // 100 + self.pan_y + self.y
-        return (screen_x, screen_y)
+        return Tuple[Int32, Int32](screen_x, screen_y)
 
     fn node_at(self, world_x: Int32, world_y: Int32) -> Int32:
         """Find node at world position. Returns node ID or -1."""
@@ -366,7 +376,7 @@ struct NodeGraphInt(BaseWidgetInt):
         return -1
 
     fn get_port_position(self, node_id: Int32, port_id: Int32,
-                         is_input: Bool) -> (Int32, Int32):
+                         is_input: Bool) -> Tuple[Int32, Int32]:
         """Get the screen position of a port."""
         for i in range(len(self.nodes)):
             var node = self.nodes[i]
@@ -376,16 +386,16 @@ struct NodeGraphInt(BaseWidgetInt):
                 if is_input:
                     for j in range(len(node.inputs)):
                         if node.inputs[j].id == port_id:
-                            port_y += j * 20
+                            port_y += Int32(j * 20)
                             return self.world_to_screen(node.x, port_y)
                 else:
                     for j in range(len(node.outputs)):
                         if node.outputs[j].id == port_id:
-                            port_y += j * 20
+                            port_y += Int32(j * 20)
                             return self.world_to_screen(node.x + node.width, port_y)
-        return (0, 0)
+        return Tuple[Int32, Int32](0, 0)
 
-    fn select_node(inout self, node_id: Int32, add_to_selection: Bool = False):
+    fn select_node(mut self, node_id: Int32, add_to_selection: Bool = False):
         """Select a node."""
         if not add_to_selection:
             self.selected_nodes.clear()
@@ -407,13 +417,13 @@ struct NodeGraphInt(BaseWidgetInt):
                     self.selected_nodes.append(node_id)
                 break
 
-    fn clear_selection(inout self):
+    fn clear_selection(mut self):
         """Clear all selection."""
         for i in range(len(self.nodes)):
             self.nodes[i].selected = False
         self.selected_nodes.clear()
 
-    fn handle_mouse_event(inout self, event: MouseEventInt) -> Bool:
+    fn handle_mouse_event(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse input."""
         var world = self.screen_to_world(event.x, event.y)
         var world_x = world[0]
@@ -488,13 +498,13 @@ struct NodeGraphInt(BaseWidgetInt):
 
         return False
 
-    fn handle_key_event(inout self, event: KeyEventInt) -> Bool:
+    fn handle_key_event(mut self, event: KeyEventInt) -> Bool:
         """Handle keyboard input."""
         if event.event_type == 1:  # Key down
             if event.key_code == 127 or event.key_code == 8:  # Delete/Backspace
                 self.delete_selected_nodes()
                 return True
-            elif event.key_code == ord('G') or event.key_code == ord('g'):
+            elif event.key_code == Int32(ord("G")) or event.key_code == Int32(ord("g")):
                 self.show_grid = not self.show_grid
                 return True
         return False

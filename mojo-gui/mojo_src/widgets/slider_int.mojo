@@ -5,11 +5,19 @@ Interactive slider for numeric value selection using integer coordinates.
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
-from ..theme_state_integration import get_theme
+from ..theme_system import get_theme
 
-struct SliderInt(BaseWidgetInt):
+struct SliderInt(WidgetInt, Copyable, Movable):
     """Interactive slider widget using integer coordinates."""
-    
+
+    # Inlined BaseWidgetInt fields (struct inheritance is not supported).
+    var bounds: RectInt
+    var visible: Bool
+    var enabled: Bool
+    var background_color: ColorInt
+    var border_color: ColorInt
+    var border_width: Int32
+
     var min_value: Int32
     var max_value: Int32
     var current_value: Int32
@@ -22,10 +30,16 @@ struct SliderInt(BaseWidgetInt):
     var drag_offset: Int32
     var orientation: Int32  # 0 = horizontal, 1 = vertical
     
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32, height: Int32, 
+    fn __init__(out self, x: Int32, y: Int32, width: Int32, height: Int32,
                min_val: Int32, max_val: Int32, initial_val: Int32):
         """Initialize slider."""
-        self.super().__init__(x, y, width, height)
+        # Inlined BaseWidgetInt.__init__
+        self.bounds = RectInt(x, y, width, height)
+        self.visible = True
+        self.enabled = True
+        self.background_color = ColorInt(230, 230, 230, 255)
+        self.border_color = ColorInt(128, 128, 128, 255)
+        self.border_width = 1
         self.min_value = min_val
         self.max_value = max_val
         self.current_value = initial_val
@@ -36,7 +50,7 @@ struct SliderInt(BaseWidgetInt):
         elif self.current_value > self.max_value:
             self.current_value = self.max_value
         
-        let theme = get_theme()
+        var theme = get_theme()
         self.track_color = theme.widget_background
         self.thumb_color = theme.accent_primary
         self.thumb_hover_color = theme.accent_hover
@@ -52,12 +66,47 @@ struct SliderInt(BaseWidgetInt):
         self.background_color = theme.widget_background
         self.border_color = theme.secondary_border
         self.border_width = 1
-    
+
+    # Inlined BaseWidgetInt methods (struct inheritance is not supported).
+    fn get_bounds(self) -> RectInt:
+        return self.bounds
+
+    fn set_bounds(mut self, bounds: RectInt):
+        self.bounds = bounds
+
+    fn is_visible(self) -> Bool:
+        return self.visible
+
+    fn set_visible(mut self, visible: Bool):
+        self.visible = visible
+
+    fn is_enabled(self) -> Bool:
+        return self.enabled
+
+    fn set_enabled(mut self, enabled: Bool):
+        self.enabled = enabled
+
+    fn contains_point(self, point: PointInt) -> Bool:
+        return self.bounds.contains(point)
+
+    fn render_background(self, ctx: RenderingContextInt):
+        if not self.visible:
+            return
+        _ = ctx.set_color(self.background_color.r, self.background_color.g,
+                          self.background_color.b, self.background_color.a)
+        _ = ctx.draw_filled_rectangle(self.bounds.x, self.bounds.y,
+                                      self.bounds.width, self.bounds.height)
+        if self.border_width > 0:
+            _ = ctx.set_color(self.border_color.r, self.border_color.g,
+                              self.border_color.b, self.border_color.a)
+            _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
+                                   self.bounds.width, self.bounds.height)
+
     fn get_value(self) -> Int32:
         """Get current slider value."""
         return self.current_value
     
-    fn set_value(inout self, value: Int32):
+    fn set_value(mut self, value: Int32):
         """Set slider value (clamped to range)."""
         if value < self.min_value:
             self.current_value = self.min_value
@@ -72,7 +121,7 @@ struct SliderInt(BaseWidgetInt):
     
     fn get_normalized_value(self) -> Float32:
         """Get value as 0.0-1.0 ratio."""
-        let range = self.get_range()
+        var range = self.get_range()
         if range == 0:
             return 0.0
         return Float32(self.current_value - self.min_value) / Float32(range)
@@ -80,37 +129,37 @@ struct SliderInt(BaseWidgetInt):
     fn get_track_rect(self) -> RectInt:
         """Get the track rectangle."""
         if self.orientation == 0:  # Horizontal
-            let track_y = self.bounds.y + (self.bounds.height - self.track_height) // 2
+            var track_y = self.bounds.y + (self.bounds.height - self.track_height) // 2
             return RectInt(self.bounds.x + self.thumb_size // 2, track_y, 
                           self.bounds.width - self.thumb_size, self.track_height)
         else:  # Vertical
-            let track_x = self.bounds.x + (self.bounds.width - self.track_height) // 2
+            var track_x = self.bounds.x + (self.bounds.width - self.track_height) // 2
             return RectInt(track_x, self.bounds.y + self.thumb_size // 2,
                           self.track_height, self.bounds.height - self.thumb_size)
     
     fn get_thumb_rect(self) -> RectInt:
         """Get the thumb rectangle."""
-        let track = self.get_track_rect()
-        let normalized = self.get_normalized_value()
+        var track = self.get_track_rect()
+        var normalized = self.get_normalized_value()
         
         if self.orientation == 0:  # Horizontal
-            let thumb_x = track.x + Int32(Float32(track.width) * normalized) - self.thumb_size // 2
-            let thumb_y = self.bounds.y + (self.bounds.height - self.thumb_size) // 2
+            var thumb_x = track.x + Int32(Float32(track.width) * normalized) - self.thumb_size // 2
+            var thumb_y = self.bounds.y + (self.bounds.height - self.thumb_size) // 2
             return RectInt(thumb_x, thumb_y, self.thumb_size, self.thumb_size)
         else:  # Vertical  
-            let thumb_x = self.bounds.x + (self.bounds.width - self.thumb_size) // 2
+            var thumb_x = self.bounds.x + (self.bounds.width - self.thumb_size) // 2
             # For vertical, 0 should be at bottom, so invert the calculation
-            let thumb_y = track.y + track.height - Int32(Float32(track.height) * normalized) - self.thumb_size // 2
+            var thumb_y = track.y + track.height - Int32(Float32(track.height) * normalized) - self.thumb_size // 2
             return RectInt(thumb_x, thumb_y, self.thumb_size, self.thumb_size)
     
     fn is_point_in_thumb(self, point: PointInt) -> Bool:
         """Check if point is inside thumb."""
-        let thumb = self.get_thumb_rect()
+        var thumb = self.get_thumb_rect()
         return thumb.contains(point)
     
     fn value_from_position(self, pos: PointInt) -> Int32:
         """Calculate value from mouse position."""
-        let track = self.get_track_rect()
+        var track = self.get_track_rect()
         var ratio: Float32 = 0.0
         
         if self.orientation == 0:  # Horizontal
@@ -128,22 +177,22 @@ struct SliderInt(BaseWidgetInt):
             ratio = 1.0
         
         # Convert to value
-        let range = self.get_range()
+        var range = self.get_range()
         return self.min_value + Int32(Float32(range) * ratio)
     
-    fn handle_mouse_event(inout self, event: MouseEventInt) -> Bool:
+    fn handle_mouse_event(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse events."""
         if not self.visible or not self.enabled:
             return False
         
-        let point = PointInt(event.x, event.y)
-        let inside = self.contains_point(point)
+        var point = PointInt(event.x, event.y)
+        var inside = self.contains_point(point)
         
         if event.pressed and inside:
             if self.is_point_in_thumb(point):
                 # Start dragging thumb
                 self.is_dragging = True
-                let thumb = self.get_thumb_rect()
+                var thumb = self.get_thumb_rect()
                 if self.orientation == 0:
                     self.drag_offset = point.x - (thumb.x + thumb.width // 2)
                 else:
@@ -167,13 +216,13 @@ struct SliderInt(BaseWidgetInt):
         
         return inside
     
-    fn handle_key_event(inout self, event: KeyEventInt) -> Bool:
+    fn handle_key_event(mut self, event: KeyEventInt) -> Bool:
         """Handle key events (arrow keys to adjust value)."""
         if not self.visible or not self.enabled:
             return False
         
         if event.pressed:
-            let step = 1
+            var step = 1
             
             if self.orientation == 0:  # Horizontal
                 if event.key_code == 262:  # Right arrow
@@ -202,22 +251,22 @@ struct SliderInt(BaseWidgetInt):
             self.render_background(ctx)
         
         # Draw track
-        let track = self.get_track_rect()
+        var track = self.get_track_rect()
         _ = ctx.set_color(self.track_color.r, self.track_color.g, 
                          self.track_color.b, self.track_color.a)
         _ = ctx.draw_filled_rectangle(track.x, track.y, track.width, track.height)
         
         # Draw track border
-        let theme = get_theme()
+        var theme = get_theme()
         _ = ctx.set_color(theme.primary_border.r, theme.primary_border.g, theme.primary_border.b, theme.primary_border.a)
         _ = ctx.draw_rectangle(track.x, track.y, track.width, track.height)
         
         # Draw thumb
-        let thumb = self.get_thumb_rect()
-        let mouse_pos = PointInt(0, 0)  # Would need mouse position for hover effect
-        let is_hover = False  # Simplified - would check mouse position
+        var thumb = self.get_thumb_rect()
+        var mouse_pos = PointInt(0, 0)  # Would need mouse position for hover effect
+        var is_hover = False  # Simplified - would check mouse position
         
-        let thumb_color = self.thumb_hover_color if is_hover else self.thumb_color
+        var thumb_color = self.thumb_hover_color if is_hover else self.thumb_color
         _ = ctx.set_color(thumb_color.r, thumb_color.g, thumb_color.b, thumb_color.a)
         _ = ctx.draw_filled_circle(thumb.x + thumb.width // 2, thumb.y + thumb.height // 2, 
                                   self.thumb_size // 2, 16)
@@ -226,7 +275,7 @@ struct SliderInt(BaseWidgetInt):
         _ = ctx.set_color(theme.primary_border.r, theme.primary_border.g, theme.primary_border.b, theme.primary_border.a)
         _ = ctx.draw_rectangle(thumb.x, thumb.y, thumb.width, thumb.height)
     
-    fn update(inout self):
+    fn update(mut self):
         """Update slider state."""
         # Nothing special to update for basic slider
         pass

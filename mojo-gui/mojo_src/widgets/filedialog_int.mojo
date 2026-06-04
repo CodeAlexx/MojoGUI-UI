@@ -4,7 +4,8 @@ Complete file picker dialog combining navigation, tree view, list view, and filt
 """
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
-from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
+from ..widget_int import WidgetInt, BaseWidgetInt
+from .widget_events_int import MouseEventInt, KeyEventInt
 from .widget_constants import *
 from .button_int import ButtonInt
 from .textedit_int import TextEditInt
@@ -13,25 +14,26 @@ from .navbar_int import NavigationBarInt
 from .searchbox_int import SearchBoxInt
 from .columnheader_int import ColumnHeaderInt
 from .icon_int import IconInt, get_file_extension, create_file_icon_int
+from .icon_int import ICON_SIZE_SMALL, ICON_FILE, ICON_FOLDER, ICON_DOCUMENT, ICON_IMAGE, ICON_AUDIO, ICON_VIDEO, ICON_HOME
 
 # Dialog modes
-alias FILE_DIALOG_OPEN = 0
-alias FILE_DIALOG_SAVE = 1
-alias FILE_DIALOG_SELECT_FOLDER = 2
-alias FILE_DIALOG_OPEN_MULTIPLE = 3
+comptime FILE_DIALOG_OPEN = 0
+comptime FILE_DIALOG_SAVE = 1
+comptime FILE_DIALOG_SELECT_FOLDER = 2
+comptime FILE_DIALOG_OPEN_MULTIPLE = 3
 
 # View modes
-alias VIEW_LIST = 0
-alias VIEW_DETAILS = 1
-alias VIEW_THUMBNAILS = 2
-alias VIEW_ICONS = 3
+comptime VIEW_LIST = 0
+comptime VIEW_DETAILS = 1
+comptime VIEW_THUMBNAILS = 2
+comptime VIEW_ICONS = 3
 
-struct FileFilter:
+struct FileFilter(Copyable, Movable):
     """File type filter."""
     var name: String
     var extensions: List[String]
-    
-    fn __init__(inout self, name: String, extensions: List[String]):
+
+    fn __init__(out self, name: String, extensions: List[String]):
         self.name = name
         self.extensions = extensions
     
@@ -40,13 +42,13 @@ struct FileFilter:
         if len(self.extensions) == 0:
             return True
         
-        let ext = get_file_extension(filename).lower()
+        var ext = get_file_extension(filename).lower()
         for filter_ext in self.extensions:
             if ext == filter_ext.lower():
                 return True
         return False
 
-struct FileEntry:
+struct FileEntry(ImplicitlyCopyable, Movable):
     """File or directory entry."""
     var name: String
     var path: String
@@ -55,19 +57,27 @@ struct FileEntry:
     var modified_time: Int64
     var icon_type: Int32
     var is_hidden: Bool
-    
-    fn __init__(inout self, name: String, path: String, is_directory: Bool):
+
+    fn __init__(out self, name: String, path: String, is_directory: Bool):
         self.name = name
         self.path = path
         self.is_directory = is_directory
         self.size = 0
         self.modified_time = 0
         self.icon_type = ICON_FOLDER if is_directory else ICON_FILE
-        self.is_hidden = name.startswith('.')
+        self.is_hidden = name.startswith(".")
 
-struct FileDialogInt(BaseWidgetInt):
+struct FileDialogInt(WidgetInt, Copyable, Movable):
     """Complete file dialog widget."""
-    
+
+    # Inlined BaseWidgetInt fields (struct inheritance is not supported).
+    var bounds: RectInt
+    var visible: Bool
+    var enabled: Bool
+    var background_color: ColorInt
+    var border_color: ColorInt
+    var border_width: Int32
+
     # Dialog properties
     var dialog_mode: Int32
     var title: String
@@ -125,10 +135,16 @@ struct FileDialogInt(BaseWidgetInt):
     var hover_color: ColorInt
     var place_selected_color: ColorInt
     
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32 = 800, height: Int32 = 600,
+    fn __init__(out self, x: Int32, y: Int32, width: Int32 = 800, height: Int32 = 600,
                 mode: Int32 = FILE_DIALOG_OPEN):
-        self.super().__init__(x, y, width, height)
-        
+        # Inlined BaseWidgetInt.__init__
+        self.bounds = RectInt(x, y, width, height)
+        self.visible = True
+        self.enabled = True
+        self.background_color = ColorInt(230, 230, 230, 255)
+        self.border_color = ColorInt(128, 128, 128, 255)
+        self.border_width = 1
+
         self.dialog_mode = mode
         self.title = self.get_title_for_mode()
         self.current_path = "/home"  # Default path
@@ -189,20 +205,58 @@ struct FileDialogInt(BaseWidgetInt):
         
         # Load initial directory
         self.load_directory(self.current_path)
-    
-    fn setup_components(inout self):
+
+    # Inlined BaseWidgetInt methods (struct inheritance is not supported).
+    fn get_bounds(self) -> RectInt:
+        return self.bounds
+
+    fn set_bounds(mut self, bounds: RectInt):
+        self.bounds = bounds
+
+    fn is_visible(self) -> Bool:
+        return self.visible
+
+    fn set_visible(mut self, visible: Bool):
+        self.visible = visible
+
+    fn is_enabled(self) -> Bool:
+        return self.enabled
+
+    fn set_enabled(mut self, enabled: Bool):
+        self.enabled = enabled
+
+    fn contains_point(self, point: PointInt) -> Bool:
+        return self.bounds.contains(point)
+
+    fn render_background(self, ctx: RenderingContextInt):
+        if not self.visible:
+            return
+        _ = ctx.set_color(self.background_color.r, self.background_color.g,
+                          self.background_color.b, self.background_color.a)
+        _ = ctx.draw_filled_rectangle(self.bounds.x, self.bounds.y,
+                                      self.bounds.width, self.bounds.height)
+        if self.border_width > 0:
+            _ = ctx.set_color(self.border_color.r, self.border_color.g,
+                              self.border_color.b, self.border_color.a)
+            _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
+                                   self.bounds.width, self.bounds.height)
+
+    fn handle_key_event(mut self, event: KeyEventInt) -> Bool:
+        return False
+
+    fn setup_components(mut self):
         """Initialize dialog components."""
         # Navigation bar
         self.navbar = NavigationBarInt(self.bounds.x, self.bounds.y + 30, 
                                       self.bounds.width, self.toolbar_height)
         
         # Search box
-        let search_x = self.bounds.x + self.bounds.width - 200
-        let search_y = self.bounds.y + 35
+        var search_x = self.bounds.x + self.bounds.width - 200
+        var search_y = self.bounds.y + 35
         self.search_box = SearchBoxInt(search_x, search_y, 180, 30, "Search files...")
         
         # Column header for details view
-        let header_y = self.bounds.y + 30 + self.toolbar_height
+        var header_y = self.bounds.y + 30 + self.toolbar_height
         self.column_header = ColumnHeaderInt(self.bounds.x + self.sidebar_width, 
                                            header_y, 
                                            self.bounds.width - self.sidebar_width, 28)
@@ -212,7 +266,7 @@ struct FileDialogInt(BaseWidgetInt):
         _ = self.column_header.add_column("modified", "Modified", 150)
         
         # Bottom panel components
-        let bottom_y = self.bounds.y + self.bounds.height - self.bottom_panel_height
+        var bottom_y = self.bounds.y + self.bounds.height - self.bottom_panel_height
         
         # File name edit
         self.file_name_edit = TextEditInt(self.bounds.x + 100, bottom_y + 15, 
@@ -223,10 +277,10 @@ struct FileDialogInt(BaseWidgetInt):
                                          self.bounds.width - 300, 25)
         
         # Buttons
-        let button_width = 80
-        let button_height = 30
-        let button_spacing = 10
-        let buttons_x = self.bounds.x + self.bounds.width - 2 * button_width - button_spacing - 20
+        var button_width = 80
+        var button_height = 30
+        var button_spacing = 10
+        var buttons_x = self.bounds.x + self.bounds.width - 2 * button_width - button_spacing - 20
         
         self.ok_button = ButtonInt(buttons_x, bottom_y + 25, 
                                   button_width, button_height, "Open")
@@ -234,7 +288,7 @@ struct FileDialogInt(BaseWidgetInt):
         self.cancel_button = ButtonInt(buttons_x + button_width + button_spacing, bottom_y + 25,
                                       button_width, button_height, "Cancel")
     
-    fn setup_places(inout self):
+    fn setup_places(mut self):
         """Set up standard places/bookmarks."""
         self.places = List[FileEntry]()
         
@@ -256,7 +310,7 @@ struct FileDialogInt(BaseWidgetInt):
         self.places[5].icon_type = ICON_AUDIO
         self.places[6].icon_type = ICON_VIDEO
     
-    fn add_default_filters(inout self):
+    fn add_default_filters(mut self):
         """Add default file filters based on dialog mode."""
         if self.dialog_mode == FILE_DIALOG_SELECT_FOLDER:
             return  # No filters for folder selection
@@ -297,17 +351,17 @@ struct FileDialogInt(BaseWidgetInt):
             return "Open Files"
         return "File Dialog"
     
-    fn navigate_to(inout self, path: String):
+    fn navigate_to(mut self, path: String):
         """Navigate to a directory."""
         self.current_path = path
         self.navbar.navigate_to(path)
         self.load_directory(path)
     
-    fn refresh_current_directory(inout self):
+    fn refresh_current_directory(mut self):
         """Refresh the current directory listing."""
         self.load_directory(self.current_path)
     
-    fn load_directory(inout self, path: String):
+    fn load_directory(mut self, path: String):
         """Load directory contents."""
         self.is_loading = True
         self.error_message = ""
@@ -345,12 +399,12 @@ struct FileDialogInt(BaseWidgetInt):
         self.is_loading = False
         self.scroll_offset = 0
     
-    fn apply_filter(inout self):
+    fn apply_filter(mut self):
         """Apply current file filter."""
         self.filtered_entries.clear()
         
         for i in range(len(self.file_entries)):
-            let entry = self.file_entries[i]
+            var entry = self.file_entries[i]
             
             # Check hidden files
             if not self.show_hidden_files and entry.is_hidden:
@@ -362,24 +416,23 @@ struct FileDialogInt(BaseWidgetInt):
                 continue
             
             # Check filter
-            if self.current_filter < len(self.filters):
-                let current_filter = self.filters[self.current_filter]
-                if current_filter.matches(entry.name):
+            if Int(self.current_filter) < len(self.filters):
+                if self.filters[self.current_filter].matches(entry.name):
                     self.filtered_entries.append(i)
             else:
                 self.filtered_entries.append(i)
     
-    fn filter_files(inout self, search_text: String):
+    fn filter_files(mut self, search_text: String):
         """Filter files by search text."""
         if len(search_text) == 0:
             self.apply_filter()
             return
         
         self.filtered_entries.clear()
-        let search_lower = search_text.lower()
+        var search_lower = search_text.lower()
         
         for i in range(len(self.file_entries)):
-            let entry = self.file_entries[i]
+            var entry = self.file_entries[i]
             
             if not self.show_hidden_files and entry.is_hidden:
                 continue
@@ -387,7 +440,7 @@ struct FileDialogInt(BaseWidgetInt):
             if search_lower in entry.name.lower():
                 self.filtered_entries.append(i)
     
-    fn sort_files(inout self, column: String, order: Int32):
+    fn sort_files(mut self, column: String, order: Int32):
         """Sort files by column."""
         # Simplified sorting - would implement proper comparison
         if order == SORT_NONE:
@@ -396,24 +449,24 @@ struct FileDialogInt(BaseWidgetInt):
     
     fn get_file_list_rect(self) -> RectInt:
         """Get rectangle for file list area."""
-        let x = self.bounds.x + self.sidebar_width
-        let y = self.bounds.y + 30 + self.toolbar_height + 
-               (28 if self.view_mode == VIEW_DETAILS else 0)
-        let width = self.bounds.width - self.sidebar_width
-        let height = self.bounds.height - 30 - self.toolbar_height - 
-                    self.bottom_panel_height - 
-                    (28 if self.view_mode == VIEW_DETAILS else 0)
+        var x = self.bounds.x + self.sidebar_width
+        var y = (self.bounds.y + 30 + self.toolbar_height +
+               (28 if self.view_mode == VIEW_DETAILS else 0))
+        var width = self.bounds.width - self.sidebar_width
+        var height = (self.bounds.height - 30 - self.toolbar_height -
+                    self.bottom_panel_height -
+                    (28 if self.view_mode == VIEW_DETAILS else 0))
         return RectInt(x, y, width, height)
     
     fn get_visible_item_count(self) -> Int32:
         """Get number of visible items in current view."""
-        let list_rect = self.get_file_list_rect()
+        var list_rect = self.get_file_list_rect()
         
         if self.view_mode == VIEW_LIST or self.view_mode == VIEW_DETAILS:
             return list_rect.height // self.list_item_height
         else:  # Grid views
-            let cols = list_rect.width // self.grid_item_width
-            let rows = list_rect.height // self.grid_item_height
+            var cols = list_rect.width // self.grid_item_width
+            var rows = list_rect.height // self.grid_item_height
             return cols * rows
     
     fn get_item_rect(self, index: Int32) -> RectInt:
@@ -421,42 +474,42 @@ struct FileDialogInt(BaseWidgetInt):
         if index < 0 or index >= len(self.filtered_entries):
             return RectInt(0, 0, 0, 0)
         
-        let list_rect = self.get_file_list_rect()
-        let visible_index = index - self.scroll_offset
+        var list_rect = self.get_file_list_rect()
+        var visible_index = index - self.scroll_offset
         
         if self.view_mode == VIEW_LIST or self.view_mode == VIEW_DETAILS:
             return RectInt(list_rect.x, list_rect.y + visible_index * self.list_item_height,
                           list_rect.width, self.list_item_height)
         else:  # Grid views
-            let cols = list_rect.width // self.grid_item_width
-            let row = visible_index // cols
-            let col = visible_index % cols
+            var cols = list_rect.width // self.grid_item_width
+            var row = visible_index // cols
+            var col = visible_index % cols
             return RectInt(list_rect.x + col * self.grid_item_width,
                           list_rect.y + row * self.grid_item_height,
                           self.grid_item_width, self.grid_item_height)
     
-    fn select_file(inout self, index: Int32, extend: Bool = False, range: Bool = False):
+    fn select_file(mut self, index: Int32, extend: Bool = False, range_select: Bool = False):
         """Select a file entry."""
         if index < 0 or index >= len(self.filtered_entries):
             return
-        
-        if self.dialog_mode != FILE_DIALOG_OPEN_MULTIPLE and not extend and not range:
+
+        if self.dialog_mode != FILE_DIALOG_OPEN_MULTIPLE and not extend and not range_select:
             # Single selection mode
             self.selected_indices.clear()
-        
-        if range and self.anchor_index >= 0:
+
+        if range_select and self.anchor_index >= 0:
             # Range selection
             self.selected_indices.clear()
-            let start = min(self.anchor_index, index)
-            let end = max(self.anchor_index, index)
-            for i in range(start, end + 1):
-                self.selected_indices.append(i)
+            var start = min(self.anchor_index, index)
+            var end = max(self.anchor_index, index)
+            for i in range(Int(start), Int(end) + 1):
+                self.selected_indices.append(Int32(i))
         elif extend:
             # Toggle selection
             var found = False
             for i in range(len(self.selected_indices)):
                 if self.selected_indices[i] == index:
-                    self.selected_indices.remove(i)
+                    _ = self.selected_indices.pop(i)
                     found = True
                     break
             if not found:
@@ -473,28 +526,28 @@ struct FileDialogInt(BaseWidgetInt):
         
         # Update file name edit
         if len(self.selected_indices) == 1:
-            let entry_idx = self.filtered_entries[self.selected_indices[0]]
-            let entry = self.file_entries[entry_idx]
+            var entry_idx = self.filtered_entries[self.selected_indices[0]]
+            var entry = self.file_entries[entry_idx]
             if not entry.is_directory:
                 self.file_name_edit.set_text(entry.name)
         
-        if not range:
+        if not range_select:
             self.anchor_index = index
     
-    fn on_ok_clicked(inout self):
+    fn on_ok_clicked(mut self):
         """Handle OK button click."""
         self.selected_files.clear()
         
         if self.dialog_mode == FILE_DIALOG_SAVE:
             # Get filename from edit box
-            let filename = self.file_name_edit.get_text()
+            var filename = self.file_name_edit.get_text()
             if len(filename) > 0:
                 self.selected_files.append(self.current_path + "/" + filename)
         else:
             # Get selected files
             for idx in self.selected_indices:
-                let entry_idx = self.filtered_entries[idx]
-                let entry = self.file_entries[entry_idx]
+                var entry_idx = self.filtered_entries[idx]
+                var entry = self.file_entries[entry_idx]
                 if self.dialog_mode == FILE_DIALOG_SELECT_FOLDER:
                     if entry.is_directory:
                         self.selected_files.append(entry.path)
@@ -502,17 +555,17 @@ struct FileDialogInt(BaseWidgetInt):
                     if not entry.is_directory:
                         self.selected_files.append(entry.path)
     
-    fn on_cancel_clicked(inout self):
+    fn on_cancel_clicked(mut self):
         """Handle Cancel button click."""
         # Would trigger callback in real implementation
         pass
     
-    fn handle_mouse_event(inout self, event: MouseEventInt) -> Bool:
+    fn handle_mouse_event(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse events."""
         if not self.visible or not self.enabled:
             return False
         
-        let point = PointInt(event.x, event.y)
+        var point = PointInt(event.x, event.y)
         
         # Handle components
         if self.navbar.handle_mouse_event(event):
@@ -536,12 +589,12 @@ struct FileDialogInt(BaseWidgetInt):
             return True
         
         # Handle file list
-        let list_rect = self.get_file_list_rect()
+        var list_rect = self.get_file_list_rect()
         if list_rect.contains(point):
             return self.handle_file_list_mouse(event)
         
         # Handle sidebar
-        let sidebar_rect = RectInt(self.bounds.x, self.bounds.y + 30 + self.toolbar_height,
+        var sidebar_rect = RectInt(self.bounds.x, self.bounds.y + 30 + self.toolbar_height,
                                    self.sidebar_width, 
                                    self.bounds.height - 30 - self.toolbar_height - self.bottom_panel_height)
         if sidebar_rect.contains(point):
@@ -549,11 +602,11 @@ struct FileDialogInt(BaseWidgetInt):
         
         return self.contains_point(point)
     
-    fn handle_file_list_mouse(inout self, event: MouseEventInt) -> Bool:
+    fn handle_file_list_mouse(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse in file list."""
         # Find which item was clicked
         for i in range(len(self.filtered_entries)):
-            let rect = self.get_item_rect(i)
+            var rect = self.get_item_rect(i)
             if rect.y < self.get_file_list_rect().y:
                 continue  # Above visible area
             if rect.y >= self.get_file_list_rect().y + self.get_file_list_rect().height:
@@ -564,11 +617,11 @@ struct FileDialogInt(BaseWidgetInt):
                 
                 if event.pressed:
                     # Check for double-click
-                    let current_time = 0  # Would use actual time
-                    if i == self.last_click_index and current_time - self.last_click_time < 500:
+                    var current_time = 0  # Would use actual time
+                    if i == Int(self.last_click_index) and current_time - self.last_click_time < 500:
                         # Double-click
-                        let entry_idx = self.filtered_entries[i]
-                        let entry = self.file_entries[entry_idx]
+                        var entry_idx = self.filtered_entries[i]
+                        var entry = self.file_entries[entry_idx]
                         if entry.is_directory:
                             self.navigate_to(entry.path)
                         else:
@@ -578,7 +631,7 @@ struct FileDialogInt(BaseWidgetInt):
                         # Single click
                         self.select_file(i, event.ctrl_held, event.shift_held)
                     
-                    self.last_click_index = i
+                    self.last_click_index = Int32(i)
                     self.last_click_time = current_time
                 
                 return True
@@ -586,19 +639,20 @@ struct FileDialogInt(BaseWidgetInt):
         self.hover_index = -1
         return True
     
-    fn handle_sidebar_mouse(inout self, event: MouseEventInt) -> Bool:
+    fn handle_sidebar_mouse(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse in sidebar."""
-        let item_height = 30
-        let y_start = self.bounds.y + 30 + self.toolbar_height + 10
+        var item_height = 30
+        var y_start = self.bounds.y + 30 + self.toolbar_height + 10
         
         for i in range(len(self.places)):
-            let item_y = y_start + i * item_height
-            let item_rect = RectInt(self.bounds.x, item_y, self.sidebar_width, item_height)
+            var item_y = y_start + i * item_height
+            var item_rect = RectInt(self.bounds.x, item_y, self.sidebar_width, item_height)
             
             if item_rect.contains(PointInt(event.x, event.y)):
                 if event.pressed:
-                    self.selected_place = i
-                    self.navigate_to(self.places[i].path)
+                    self.selected_place = Int32(i)
+                    var place_path = String(self.places[i].path)
+                    self.navigate_to(place_path)
                 return True
         
         return True
@@ -641,7 +695,7 @@ struct FileDialogInt(BaseWidgetInt):
         _ = ctx.draw_text(self.title, self.bounds.x + 10, self.bounds.y + 8, 12)
         
         # Close button
-        let close_x = self.bounds.x + self.bounds.width - 25
+        var close_x = self.bounds.x + self.bounds.width - 25
         _ = ctx.set_color(200, 0, 0, 255)
         _ = ctx.draw_line(close_x, self.bounds.y + 10, close_x + 10, self.bounds.y + 20, 2)
         _ = ctx.draw_line(close_x, self.bounds.y + 20, close_x + 10, self.bounds.y + 10, 2)
@@ -654,7 +708,7 @@ struct FileDialogInt(BaseWidgetInt):
     
     fn render_sidebar(self, ctx: RenderingContextInt):
         """Render sidebar with places."""
-        let sidebar_rect = RectInt(self.bounds.x, self.bounds.y + 30 + self.toolbar_height,
+        var sidebar_rect = RectInt(self.bounds.x, self.bounds.y + 30 + self.toolbar_height,
                                   self.sidebar_width, 
                                   self.bounds.height - 30 - self.toolbar_height - self.bottom_panel_height)
         
@@ -668,22 +722,22 @@ struct FileDialogInt(BaseWidgetInt):
         _ = ctx.draw_text("PLACES", sidebar_rect.x + 10, sidebar_rect.y + 10, 11)
         
         # Place items
-        let item_height = 30
-        let y_start = sidebar_rect.y + 30
+        var item_height = 30
+        var y_start = sidebar_rect.y + 30
         
         for i in range(len(self.places)):
-            let item_y = y_start + i * item_height
-            let item_rect = RectInt(sidebar_rect.x, item_y, sidebar_rect.width, item_height)
+            var item_y = y_start + i * item_height
+            var item_rect = RectInt(sidebar_rect.x, item_y, sidebar_rect.width, item_height)
             
             # Selection/hover background
-            if i == self.selected_place:
+            if Int32(i) == self.selected_place:
                 _ = ctx.set_color(self.place_selected_color.r, self.place_selected_color.g,
                                  self.place_selected_color.b, self.place_selected_color.a)
                 _ = ctx.draw_filled_rectangle(item_rect.x, item_rect.y,
                                              item_rect.width, item_rect.height)
             
             # Icon
-            let icon = IconInt(item_rect.x + 10, item_rect.y + 7, 
+            var icon = IconInt(item_rect.x + 10, item_rect.y + 7, 
                               self.places[i].icon_type, ICON_SIZE_SMALL)
             icon.render(ctx)
             
@@ -700,7 +754,7 @@ struct FileDialogInt(BaseWidgetInt):
     
     fn render_file_list(self, ctx: RenderingContextInt):
         """Render file list area."""
-        let list_rect = self.get_file_list_rect()
+        var list_rect = self.get_file_list_rect()
         
         _ = ctx.set_color(self.list_bg_color.r, self.list_bg_color.g,
                          self.list_bg_color.b, self.list_bg_color.a)
@@ -712,9 +766,9 @@ struct FileDialogInt(BaseWidgetInt):
             self.column_header.render(ctx)
         
         # Render visible items
-        let visible_count = self.get_visible_item_count()
-        let start_index = self.scroll_offset
-        let end_index = min(start_index + visible_count, len(self.filtered_entries))
+        var visible_count = self.get_visible_item_count()
+        var start_index = self.scroll_offset
+        var end_index = min(start_index + visible_count, Int32(len(self.filtered_entries)))
         
         for i in range(start_index, end_index):
             self.render_file_item(ctx, i)
@@ -731,9 +785,9 @@ struct FileDialogInt(BaseWidgetInt):
     
     fn render_file_item(self, ctx: RenderingContextInt, index: Int32):
         """Render a single file item."""
-        let rect = self.get_item_rect(index)
-        let entry_idx = self.filtered_entries[index]
-        let entry = self.file_entries[entry_idx]
+        var rect = self.get_item_rect(index)
+        var entry_idx = self.filtered_entries[index]
+        var entry = self.file_entries[entry_idx]
         
         # Background for selection/hover
         var is_selected = False
@@ -753,12 +807,12 @@ struct FileDialogInt(BaseWidgetInt):
         
         if self.view_mode == VIEW_LIST or self.view_mode == VIEW_DETAILS:
             # Icon
-            let icon = IconInt(rect.x + 4, rect.y + 4, entry.icon_type, ICON_SIZE_SMALL)
+            var icon = IconInt(rect.x + 4, rect.y + 4, entry.icon_type, ICON_SIZE_SMALL)
             icon.render(ctx)
             
             # Name
-            let text_color = ColorInt(255, 255, 255, 255) if is_selected 
-                           else ColorInt(0, 0, 0, 255)
+            var text_color = (ColorInt(255, 255, 255, 255) if is_selected
+                           else ColorInt(0, 0, 0, 255))
             _ = ctx.set_color(text_color.r, text_color.g, text_color.b, text_color.a)
             _ = ctx.draw_text(entry.name, rect.x + 24, rect.y + 6, 12)
             
@@ -766,12 +820,12 @@ struct FileDialogInt(BaseWidgetInt):
             if self.view_mode == VIEW_DETAILS:
                 # Size
                 if not entry.is_directory:
-                    let size_text = self.format_file_size(entry.size)
+                    var size_text = self.format_file_size(entry.size)
                     _ = ctx.draw_text(size_text, rect.x + 324, rect.y + 6, 12)
                 
                 # Type
-                let type_text = "Folder" if entry.is_directory else 
-                               get_file_extension(entry.name)
+                var type_text = ("Folder" if entry.is_directory else
+                               get_file_extension(entry.name))
                 _ = ctx.draw_text(type_text, rect.x + 424, rect.y + 6, 12)
                 
                 # Modified (placeholder)
@@ -779,24 +833,24 @@ struct FileDialogInt(BaseWidgetInt):
         else:
             # Grid view - render as tiles
             # Icon (larger)
-            let icon_x = rect.x + (rect.width - self.thumbnail_size) // 2
-            let icon_y = rect.y + 10
-            let icon = IconInt(icon_x, icon_y, entry.icon_type, self.thumbnail_size)
+            var icon_x = rect.x + (rect.width - self.thumbnail_size) // 2
+            var icon_y = rect.y + 10
+            var icon = IconInt(icon_x, icon_y, entry.icon_type, self.thumbnail_size)
             icon.render(ctx)
             
             # Name (centered, possibly wrapped)
-            let text_color = ColorInt(255, 255, 255, 255) if is_selected 
-                           else ColorInt(0, 0, 0, 255)
+            var text_color = (ColorInt(255, 255, 255, 255) if is_selected
+                           else ColorInt(0, 0, 0, 255))
             _ = ctx.set_color(text_color.r, text_color.g, text_color.b, text_color.a)
             
-            let text_width = len(entry.name) * 6
-            let text_x = rect.x + (rect.width - text_width) // 2
-            let text_y = rect.y + self.thumbnail_size + 20
+            var text_width = len(entry.name) * 6
+            var text_x = rect.x + (rect.width - text_width) // 2
+            var text_y = rect.y + self.thumbnail_size + 20
             _ = ctx.draw_text(entry.name, text_x, text_y, 11)
     
     fn render_bottom_panel(self, ctx: RenderingContextInt):
         """Render bottom panel with controls."""
-        let panel_y = self.bounds.y + self.bounds.height - self.bottom_panel_height
+        var panel_y = self.bounds.y + self.bounds.height - self.bottom_panel_height
         
         _ = ctx.set_color(240, 240, 240, 255)
         _ = ctx.draw_filled_rectangle(self.bounds.x, panel_y,
@@ -822,15 +876,15 @@ struct FileDialogInt(BaseWidgetInt):
     fn format_file_size(self, size: Int64) -> String:
         """Format file size for display."""
         if size < 1024:
-            return str(size) + " B"
+            return String(size) + " B"
         elif size < 1024 * 1024:
-            return str(size // 1024) + " KB"
+            return String(size // 1024) + " KB"
         elif size < 1024 * 1024 * 1024:
-            return str(size // (1024 * 1024)) + " MB"
+            return String(size // (1024 * 1024)) + " MB"
         else:
-            return str(size // (1024 * 1024 * 1024)) + " GB"
+            return String(size // (1024 * 1024 * 1024)) + " GB"
     
-    fn update(inout self):
+    fn update(mut self):
         """Update file dialog state."""
         self.navbar.update()
         self.search_box.update()
@@ -840,7 +894,7 @@ struct FileDialogInt(BaseWidgetInt):
         self.ok_button.update()
         self.cancel_button.update()
     
-    fn set_filters(inout self, filters: List[FileFilter]):
+    fn set_filters(mut self, filters: List[FileFilter]):
         """Set file type filters."""
         self.filters = filters
         self.filter_dropdown.clear()
@@ -862,10 +916,10 @@ fn create_save_file_dialog(x: Int32 = 100, y: Int32 = 100) -> FileDialogInt:
     """Create a save file dialog."""
     var dialog = FileDialogInt(x, y, 800, 600, FILE_DIALOG_SAVE)
     dialog.ok_button.set_text("Save")
-    return dialog
+    return dialog^
 
 fn create_folder_dialog(x: Int32 = 100, y: Int32 = 100) -> FileDialogInt:
     """Create a folder selection dialog."""
     var dialog = FileDialogInt(x, y, 800, 600, FILE_DIALOG_SELECT_FOLDER)
     dialog.ok_button.set_text("Select")
-    return dialog
+    return dialog^

@@ -5,11 +5,19 @@ Interactive text input field using integer coordinates.
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
-from ..theme_state_integration import get_theme
+from ..theme_system import get_theme
 
-struct TextEditInt(BaseWidgetInt):
+struct TextEditInt(WidgetInt, Copyable, Movable):
     """Interactive text input widget using integer coordinates."""
-    
+
+    # Inlined BaseWidgetInt fields (struct inheritance is not supported).
+    var bounds: RectInt
+    var visible: Bool
+    var enabled: Bool
+    var background_color: ColorInt
+    var border_color: ColorInt
+    var border_width: Int32
+
     var text: String
     var placeholder: String
     var text_color: ColorInt
@@ -26,12 +34,18 @@ struct TextEditInt(BaseWidgetInt):
     var is_readonly: Bool
     var padding: Int32
     
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32, height: Int32, placeholder: String = ""):
+    fn __init__(out self, x: Int32, y: Int32, width: Int32, height: Int32, placeholder: String = ""):
         """Initialize text edit field."""
-        self.super().__init__(x, y, width, height)
+        # Inlined BaseWidgetInt.__init__
+        self.bounds = RectInt(x, y, width, height)
+        self.visible = True
+        self.enabled = True
+        self.background_color = ColorInt(230, 230, 230, 255)
+        self.border_color = ColorInt(128, 128, 128, 255)
+        self.border_width = 1
         self.text = ""
         self.placeholder = placeholder
-        let theme = get_theme()
+        var theme = get_theme()
         self.text_color = theme.primary_text
         self.placeholder_color = theme.secondary_text
         self.selection_color = theme.selection_background
@@ -50,38 +64,73 @@ struct TextEditInt(BaseWidgetInt):
         self.background_color = theme.text_field_background
         self.border_color = theme.primary_border
         self.border_width = 2
-    
+
+    # Inlined BaseWidgetInt methods (struct inheritance is not supported).
+    fn get_bounds(self) -> RectInt:
+        return self.bounds
+
+    fn set_bounds(mut self, bounds: RectInt):
+        self.bounds = bounds
+
+    fn is_visible(self) -> Bool:
+        return self.visible
+
+    fn set_visible(mut self, visible: Bool):
+        self.visible = visible
+
+    fn is_enabled(self) -> Bool:
+        return self.enabled
+
+    fn set_enabled(mut self, enabled: Bool):
+        self.enabled = enabled
+
+    fn contains_point(self, point: PointInt) -> Bool:
+        return self.bounds.contains(point)
+
+    fn render_background(self, ctx: RenderingContextInt):
+        if not self.visible:
+            return
+        _ = ctx.set_color(self.background_color.r, self.background_color.g,
+                          self.background_color.b, self.background_color.a)
+        _ = ctx.draw_filled_rectangle(self.bounds.x, self.bounds.y,
+                                      self.bounds.width, self.bounds.height)
+        if self.border_width > 0:
+            _ = ctx.set_color(self.border_color.r, self.border_color.g,
+                              self.border_color.b, self.border_color.a)
+            _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
+                                   self.bounds.width, self.bounds.height)
+
     fn get_text(self) -> String:
         """Get current text."""
         return self.text
     
-    fn set_text(inout self, text: String):
+    fn set_text(mut self, text: String):
         """Set text content."""
-        if len(text) <= self.max_length:
+        if len(text) <= Int(self.max_length):
             self.text = text
-            self.cursor_position = len(text)
+            self.cursor_position = Int32(len(text))
             self.clear_selection()
         else:
             # Truncate if too long
-            self.text = text[:self.max_length]
+            self.text = String(text[:Int(self.max_length)])
             self.cursor_position = self.max_length
             self.clear_selection()
     
-    fn set_placeholder(inout self, placeholder: String):
+    fn set_placeholder(mut self, placeholder: String):
         """Set placeholder text."""
         self.placeholder = placeholder
     
-    fn set_readonly(inout self, readonly: Bool):
+    fn set_readonly(mut self, readonly: Bool):
         """Set readonly state."""
         self.is_readonly = readonly
     
-    fn set_focus(inout self, focused: Bool):
+    fn set_focus(mut self, focused: Bool):
         """Set focus state."""
         self.is_focused = focused
         if not focused:
             self.clear_selection()
     
-    fn clear_selection(inout self):
+    fn clear_selection(mut self):
         """Clear text selection."""
         self.selection_start = -1
         self.selection_end = -1
@@ -90,16 +139,16 @@ struct TextEditInt(BaseWidgetInt):
         """Check if there's a text selection."""
         return self.selection_start >= 0 and self.selection_end >= 0 and self.selection_start != self.selection_end
     
-    fn get_selection_bounds(self) -> (Int32, Int32):
+    fn get_selection_bounds(self) -> Tuple[Int32, Int32]:
         """Get selection start and end (ordered)."""
         if not self.has_selection():
-            return (self.cursor_position, self.cursor_position)
-        
-        let start = self.selection_start if self.selection_start < self.selection_end else self.selection_end
-        let end = self.selection_end if self.selection_end > self.selection_start else self.selection_start
-        return (start, end)
+            return Tuple[Int32, Int32](self.cursor_position, self.cursor_position)
+
+        var start = self.selection_start if self.selection_start < self.selection_end else self.selection_end
+        var end = self.selection_end if self.selection_end > self.selection_start else self.selection_start
+        return Tuple[Int32, Int32](start, end)
     
-    fn insert_text_at_cursor(inout self, insert_text: String):
+    fn insert_text_at_cursor(mut self, insert_text: String):
         """Insert text at cursor position."""
         if self.is_readonly:
             return
@@ -109,32 +158,32 @@ struct TextEditInt(BaseWidgetInt):
             self.delete_selection()
         
         # Check length limit
-        if len(self.text) + len(insert_text) > self.max_length:
+        if len(self.text) + len(insert_text) > Int(self.max_length):
             return
         
         # Insert text
-        let before = self.text[:self.cursor_position]
-        let after = self.text[self.cursor_position:]
+        var before = self.text[:Int(self.cursor_position)]
+        var after = self.text[Int(self.cursor_position):]
         self.text = before + insert_text + after
         self.cursor_position += len(insert_text)
         self.clear_selection()
     
-    fn delete_selection(inout self):
+    fn delete_selection(mut self):
         """Delete selected text."""
         if not self.has_selection() or self.is_readonly:
             return
         
-        let bounds = self.get_selection_bounds()
-        let start = bounds.0
-        let end = bounds.1
-        
-        let before = self.text[:start]
-        let after = self.text[end:]
+        var bounds = self.get_selection_bounds()
+        var start = bounds[0]
+        var end = bounds[1]
+
+        var before = self.text[:Int(start)]
+        var after = self.text[Int(end):]
         self.text = before + after
         self.cursor_position = start
         self.clear_selection()
     
-    fn delete_char_before_cursor(inout self):
+    fn delete_char_before_cursor(mut self):
         """Delete character before cursor (Backspace)."""
         if self.is_readonly:
             return
@@ -142,12 +191,12 @@ struct TextEditInt(BaseWidgetInt):
         if self.has_selection():
             self.delete_selection()
         elif self.cursor_position > 0:
-            let before = self.text[:self.cursor_position - 1]
-            let after = self.text[self.cursor_position:]
+            var before = self.text[:Int(self.cursor_position) - 1]
+            var after = self.text[Int(self.cursor_position):]
             self.text = before + after
             self.cursor_position -= 1
     
-    fn delete_char_after_cursor(inout self):
+    fn delete_char_after_cursor(mut self):
         """Delete character after cursor (Delete)."""
         if self.is_readonly:
             return
@@ -155,13 +204,13 @@ struct TextEditInt(BaseWidgetInt):
         if self.has_selection():
             self.delete_selection()
         elif self.cursor_position < len(self.text):
-            let before = self.text[:self.cursor_position]
-            let after = self.text[self.cursor_position + 1:]
+            var before = self.text[:Int(self.cursor_position)]
+            var after = self.text[Int(self.cursor_position) + 1:]
             self.text = before + after
     
-    fn move_cursor(inout self, delta: Int32, extend_selection: Bool = False):
+    fn move_cursor(mut self, delta: Int32, extend_selection: Bool = False):
         """Move cursor position."""
-        let new_pos = self.cursor_position + delta
+        var new_pos = self.cursor_position + delta
         
         # Clamp position
         if new_pos < 0:
@@ -184,22 +233,22 @@ struct TextEditInt(BaseWidgetInt):
         return RectInt(self.bounds.x + self.padding, self.bounds.y + self.padding,
                       self.bounds.width - 2 * self.padding, self.bounds.height - 2 * self.padding)
     
-    fn handle_mouse_event(inout self, event: MouseEventInt) -> Bool:
+    fn handle_mouse_event(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse events."""
         if not self.visible or not self.enabled:
             return False
         
-        let point = PointInt(event.x, event.y)
-        let inside = self.contains_point(point)
+        var point = PointInt(event.x, event.y)
+        var inside = self.contains_point(point)
         
         if event.pressed and inside:
             # Set focus and position cursor
             self.set_focus(True)
             
             # Simple cursor positioning (would need text metrics for accuracy)
-            let text_rect = self.get_text_rect()
-            let char_width = self.font_size * 6 / 10  # Rough approximation
-            let relative_x = point.x - text_rect.x
+            var text_rect = self.get_text_rect()
+            var char_width = self.font_size * 6 / 10  # Rough approximation
+            var relative_x = point.x - text_rect.x
             self.cursor_position = relative_x / char_width
             
             # Clamp cursor position
@@ -216,13 +265,13 @@ struct TextEditInt(BaseWidgetInt):
         
         return inside
     
-    fn handle_key_event(inout self, event: KeyEventInt) -> Bool:
+    fn handle_key_event(mut self, event: KeyEventInt) -> Bool:
         """Handle keyboard input."""
         if not self.visible or not self.enabled or not self.is_focused:
             return False
         
         if event.pressed:
-            let key = event.key_code
+            var key = event.key_code
             
             # Special keys
             if key == 259:  # Backspace
@@ -250,7 +299,7 @@ struct TextEditInt(BaseWidgetInt):
                 return True
             elif key >= 32 and key <= 126:  # Printable ASCII
                 # Insert character
-                let char_text = chr(key)
+                var char_text = chr(Int(key))
                 self.insert_text_at_cursor(char_text)
                 return True
         
@@ -266,18 +315,18 @@ struct TextEditInt(BaseWidgetInt):
         
         # Update focus appearance
         if self.is_focused:
-            let theme = get_theme()
+            var theme = get_theme()
             _ = ctx.set_color(theme.accent_primary.r, theme.accent_primary.g, theme.accent_primary.b, theme.accent_primary.a)
             _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y, self.bounds.width, self.bounds.height)
         
-        let text_rect = self.get_text_rect()
+        var text_rect = self.get_text_rect()
         
         # Draw selection background
         if self.has_selection():
-            let bounds = self.get_selection_bounds()
-            let char_width = self.font_size * 6 / 10  # Rough approximation
-            let sel_x = text_rect.x + bounds.0 * char_width
-            let sel_width = (bounds.1 - bounds.0) * char_width
+            var bounds = self.get_selection_bounds()
+            var char_width = self.font_size * 6 / 10  # Rough approximation
+            var sel_x = text_rect.x + bounds[0] * char_width
+            var sel_width = (bounds[1] - bounds[0]) * char_width
             
             _ = ctx.set_color(self.selection_color.r, self.selection_color.g, 
                              self.selection_color.b, self.selection_color.a)
@@ -295,14 +344,14 @@ struct TextEditInt(BaseWidgetInt):
         
         # Draw cursor
         if self.is_focused and (self.cursor_blink_time // 30) % 2 == 0:  # Blink every 30 frames
-            let char_width = self.font_size * 6 / 10  # Rough approximation
-            let cursor_x = text_rect.x + self.cursor_position * char_width
+            var char_width = self.font_size * 6 / 10  # Rough approximation
+            var cursor_x = text_rect.x + self.cursor_position * char_width
             
             _ = ctx.set_color(self.cursor_color.r, self.cursor_color.g, 
                              self.cursor_color.b, self.cursor_color.a)
             _ = ctx.draw_line(cursor_x, text_rect.y, cursor_x, text_rect.y + text_rect.height, 1)
     
-    fn update(inout self):
+    fn update(mut self):
         """Update text edit state."""
         if self.is_focused:
             self.cursor_blink_time += 1

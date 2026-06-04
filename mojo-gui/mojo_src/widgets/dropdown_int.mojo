@@ -4,25 +4,34 @@ Dropdown selection widget with customizable items.
 """
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
-from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
+from ..widget_int import WidgetInt
+from .widget_events_int import MouseEventInt, KeyEventInt
 from .widget_constants import *
 
-struct DropdownItem:
+struct DropdownItem(ImplicitlyCopyable, Movable):
     """Individual dropdown item."""
     var text: String
     var icon: String
     var data: Int32
     var enabled: Bool
-    
-    fn __init__(inout self, text: String, icon: String = "", data: Int32 = 0):
+
+    fn __init__(out self, text: String, icon: String = "", data: Int32 = 0):
         self.text = text
         self.icon = icon
         self.data = data
         self.enabled = True
 
-struct DropdownInt(BaseWidgetInt):
+struct DropdownInt(Copyable, Movable):
     """Dropdown/ComboBox widget."""
-    
+
+    # Inlined BaseWidgetInt fields (struct inheritance is not supported).
+    var bounds: RectInt
+    var visible: Bool
+    var enabled: Bool
+    var background_color: ColorInt
+    var border_color: ColorInt
+    var border_width: Int32
+
     var items: List[DropdownItem]
     var selected_index: Int32
     var is_open: Bool
@@ -49,9 +58,15 @@ struct DropdownInt(BaseWidgetInt):
     var button_hover_color: ColorInt
     var arrow_color: ColorInt
     
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32, height: Int32 = 25):
-        self.super().__init__(x, y, width, height)
-        
+    fn __init__(out self, x: Int32, y: Int32, width: Int32, height: Int32 = 25):
+        # Inlined BaseWidgetInt.__init__
+        self.bounds = RectInt(x, y, width, height)
+        self.visible = True
+        self.enabled = True
+        self.background_color = ColorInt(230, 230, 230, 255)
+        self.border_color = ColorInt(128, 128, 128, 255)
+        self.border_width = 1
+
         self.items = List[DropdownItem]()
         self.selected_index = -1
         self.is_open = False
@@ -81,8 +96,43 @@ struct DropdownInt(BaseWidgetInt):
         self.background_color = ColorInt(255, 255, 255, 255)
         self.border_color = ColorInt(180, 180, 180, 255)
         self.border_width = 1
-    
-    fn add_item(inout self, text: String, icon: String = "", data: Int32 = 0):
+
+    # Inlined BaseWidgetInt methods (struct inheritance is not supported).
+    fn get_bounds(self) -> RectInt:
+        return self.bounds
+
+    fn set_bounds(mut self, bounds: RectInt):
+        self.bounds = bounds
+
+    fn is_visible(self) -> Bool:
+        return self.visible
+
+    fn set_visible(mut self, visible: Bool):
+        self.visible = visible
+
+    fn is_enabled(self) -> Bool:
+        return self.enabled
+
+    fn set_enabled(mut self, enabled: Bool):
+        self.enabled = enabled
+
+    fn contains_point(self, point: PointInt) -> Bool:
+        return self.bounds.contains(point)
+
+    fn render_background(self, ctx: RenderingContextInt):
+        if not self.visible:
+            return
+        _ = ctx.set_color(self.background_color.r, self.background_color.g,
+                          self.background_color.b, self.background_color.a)
+        _ = ctx.draw_filled_rectangle(self.bounds.x, self.bounds.y,
+                                      self.bounds.width, self.bounds.height)
+        if self.border_width > 0:
+            _ = ctx.set_color(self.border_color.r, self.border_color.g,
+                              self.border_color.b, self.border_color.a)
+            _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
+                                   self.bounds.width, self.bounds.height)
+
+    fn add_item(mut self, text: String, icon: String = "", data: Int32 = 0):
         """Add an item to the dropdown."""
         self.items.append(DropdownItem(text, icon, data))
         
@@ -90,7 +140,7 @@ struct DropdownInt(BaseWidgetInt):
         if self.selected_index < 0 and len(self.items) == 1:
             self.selected_index = 0
     
-    fn clear(inout self):
+    fn clear(mut self):
         """Clear all items."""
         self.items.clear()
         self.selected_index = -1
@@ -110,7 +160,7 @@ struct DropdownInt(BaseWidgetInt):
             return self.items[self.selected_index].text
         return ""
     
-    fn set_selected_index(inout self, index: Int32):
+    fn set_selected_index(mut self, index: Int32):
         """Set selected item by index."""
         if index >= -1 and index < len(self.items):
             self.selected_index = index
@@ -119,7 +169,7 @@ struct DropdownInt(BaseWidgetInt):
             else:
                 self.edit_text = ""
     
-    fn set_selected_text(inout self, text: String):
+    fn set_selected_text(mut self, text: String):
         """Set selected item by text."""
         for i in range(len(self.items)):
             if self.items[i].text == text:
@@ -133,19 +183,19 @@ struct DropdownInt(BaseWidgetInt):
     
     fn get_dropdown_rect(self) -> RectInt:
         """Get dropdown list rectangle."""
-        let visible_items = min(len(self.items), self.max_visible_items)
-        let height = visible_items * self.item_height + 4
+        var visible_items = min(Int32(len(self.items)), self.max_visible_items)
+        var height = visible_items * self.item_height + 4
         
         # Position below or above based on available space
-        let below_y = self.bounds.y + self.bounds.height
+        var below_y = self.bounds.y + self.bounds.height
         # In real implementation, would check screen bounds
         
         return RectInt(self.bounds.x, below_y, self.bounds.width, height)
     
     fn get_item_rect(self, index: Int32) -> RectInt:
         """Get rectangle for dropdown item."""
-        let dropdown_rect = self.get_dropdown_rect()
-        let visible_index = index - self.scroll_offset
+        var dropdown_rect = self.get_dropdown_rect()
+        var visible_index = index - self.scroll_offset
         
         if visible_index < 0 or visible_index >= self.max_visible_items:
             return RectInt(0, 0, 0, 0)
@@ -154,7 +204,7 @@ struct DropdownInt(BaseWidgetInt):
                       dropdown_rect.y + 2 + visible_index * self.item_height,
                       dropdown_rect.width - 4, self.item_height)
     
-    fn ensure_selected_visible(inout self):
+    fn ensure_selected_visible(mut self):
         """Ensure selected item is visible when dropdown opens."""
         if self.selected_index < 0:
             return
@@ -164,21 +214,21 @@ struct DropdownInt(BaseWidgetInt):
         elif self.selected_index >= self.scroll_offset + self.max_visible_items:
             self.scroll_offset = self.selected_index - self.max_visible_items + 1
     
-    fn handle_mouse_event(inout self, event: MouseEventInt) -> Bool:
+    fn handle_mouse_event(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse events."""
         if not self.visible or not self.enabled:
             return False
         
-        let point = PointInt(event.x, event.y)
+        var point = PointInt(event.x, event.y)
         
         # Handle dropdown list if open
         if self.is_open:
-            let dropdown_rect = self.get_dropdown_rect()
+            var dropdown_rect = self.get_dropdown_rect()
             if dropdown_rect.contains(point):
                 # Find which item
-                for i in range(self.scroll_offset, 
-                              min(self.scroll_offset + self.max_visible_items, len(self.items))):
-                    let item_rect = self.get_item_rect(i)
+                for i in range(self.scroll_offset,
+                              min(self.scroll_offset + self.max_visible_items, Int32(len(self.items)))):
+                    var item_rect = self.get_item_rect(i)
                     if item_rect.contains(point):
                         self.hover_index = i
                         
@@ -209,7 +259,7 @@ struct DropdownInt(BaseWidgetInt):
         
         return False
     
-    fn handle_key_event(inout self, event: KeyEventInt) -> Bool:
+    fn handle_key_event(mut self, event: KeyEventInt) -> Bool:
         """Handle keyboard events."""
         if not self.visible or not self.enabled:
             return False
@@ -217,7 +267,7 @@ struct DropdownInt(BaseWidgetInt):
         if not event.pressed:
             return False
         
-        let key = event.key_code
+        var key = event.key_code
         
         if self.is_open:
             if key == KEY_UP:
@@ -277,12 +327,12 @@ struct DropdownInt(BaseWidgetInt):
                              self.disabled_text_color.b, self.disabled_text_color.a)
             display_text = "Select..."
         
-        let text_y = self.bounds.y + (self.bounds.height - self.font_size) // 2
+        var text_y = self.bounds.y + (self.bounds.height - self.font_size) // 2
         _ = ctx.draw_text(display_text, self.bounds.x + self.padding, text_y, self.font_size)
         
         # Dropdown button
-        let button_x = self.bounds.x + self.bounds.width - self.dropdown_button_width
-        let button_color = self.button_hover_color if self.is_open else self.button_color
+        var button_x = self.bounds.x + self.bounds.width - self.dropdown_button_width
+        var button_color = self.button_hover_color if self.is_open else self.button_color
         
         _ = ctx.set_color(button_color.r, button_color.g, button_color.b, button_color.a)
         _ = ctx.draw_filled_rectangle(button_x, self.bounds.y, 
@@ -291,8 +341,8 @@ struct DropdownInt(BaseWidgetInt):
         # Arrow
         _ = ctx.set_color(self.arrow_color.r, self.arrow_color.g,
                          self.arrow_color.b, self.arrow_color.a)
-        let arrow_x = button_x + self.dropdown_button_width // 2
-        let arrow_y = self.bounds.y + self.bounds.height // 2
+        var arrow_x = button_x + self.dropdown_button_width // 2
+        var arrow_y = self.bounds.y + self.bounds.height // 2
         
         if self.is_open:
             # Up arrow
@@ -315,7 +365,7 @@ struct DropdownInt(BaseWidgetInt):
     
     fn render_dropdown_list(self, ctx: RenderingContextInt):
         """Render the dropdown list."""
-        let rect = self.get_dropdown_rect()
+        var rect = self.get_dropdown_rect()
         
         # Shadow
         _ = ctx.set_color(0, 0, 0, 30)
@@ -327,8 +377,8 @@ struct DropdownInt(BaseWidgetInt):
         _ = ctx.draw_filled_rectangle(rect.x, rect.y, rect.width, rect.height)
         
         # Items
-        let visible_start = self.scroll_offset
-        let visible_end = min(visible_start + self.max_visible_items, len(self.items))
+        var visible_start = self.scroll_offset
+        var visible_end = min(visible_start + self.max_visible_items, Int32(len(self.items)))
         
         for i in range(visible_start, visible_end):
             self.render_dropdown_item(ctx, i)
@@ -338,7 +388,7 @@ struct DropdownInt(BaseWidgetInt):
             # Up scroll indicator
             _ = ctx.set_color(self.arrow_color.r, self.arrow_color.g,
                              self.arrow_color.b, self.arrow_color.a)
-            let x = rect.x + rect.width // 2
+            var x = rect.x + rect.width // 2
             _ = ctx.draw_line(x - 4, rect.y + 8, x, rect.y + 4, 2)
             _ = ctx.draw_line(x, rect.y + 4, x + 4, rect.y + 8, 2)
         
@@ -346,8 +396,8 @@ struct DropdownInt(BaseWidgetInt):
             # Down scroll indicator
             _ = ctx.set_color(self.arrow_color.r, self.arrow_color.g,
                              self.arrow_color.b, self.arrow_color.a)
-            let x = rect.x + rect.width // 2
-            let y = rect.y + rect.height - 8
+            var x = rect.x + rect.width // 2
+            var y = rect.y + rect.height - 8
             _ = ctx.draw_line(x - 4, y, x, y + 4, 2)
             _ = ctx.draw_line(x, y + 4, x + 4, y, 2)
         
@@ -358,8 +408,8 @@ struct DropdownInt(BaseWidgetInt):
     
     fn render_dropdown_item(self, ctx: RenderingContextInt, index: Int32):
         """Render individual dropdown item."""
-        let item = self.items[index]
-        let rect = self.get_item_rect(index)
+        var item = self.items[index]
+        var rect = self.get_item_rect(index)
         
         if rect.width <= 0 or rect.height <= 0:
             return
@@ -386,21 +436,21 @@ struct DropdownInt(BaseWidgetInt):
             x += self.icon_size + 4
         
         # Text
-        let text_color = self.text_color if item.enabled else self.disabled_text_color
-        let is_selected_white = index == self.selected_index
+        var text_color = self.text_color if item.enabled else self.disabled_text_color
+        var is_selected_white = index == self.selected_index
         if is_selected_white:
             _ = ctx.set_color(255, 255, 255, 255)
         else:
             _ = ctx.set_color(text_color.r, text_color.g, text_color.b, text_color.a)
         
-        let text_y = rect.y + (rect.height - self.font_size) // 2
+        var text_y = rect.y + (rect.height - self.font_size) // 2
         _ = ctx.draw_text(item.text, x, text_y, self.font_size)
     
-    fn update(inout self):
+    fn update(mut self):
         """Update dropdown state."""
         pass
-    
-    fn set_editable(inout self, editable: Bool):
+
+    fn set_editable(mut self, editable: Bool):
         """Set whether dropdown is editable."""
         self.editable = editable
     
@@ -414,7 +464,7 @@ struct DropdownInt(BaseWidgetInt):
             return self.items[index].text
         return ""
     
-    fn set_item_enabled(inout self, index: Int32, enabled: Bool):
+    fn set_item_enabled(mut self, index: Int32, enabled: Bool):
         """Enable or disable an item."""
         if index >= 0 and index < len(self.items):
             self.items[index].enabled = enabled
@@ -428,4 +478,4 @@ fn create_combobox_int(x: Int32, y: Int32, width: Int32, height: Int32 = 25) -> 
     """Create an editable combobox."""
     var combo = DropdownInt(x, y, width, height)
     combo.set_editable(True)
-    return combo
+    return combo^

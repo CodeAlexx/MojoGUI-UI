@@ -8,17 +8,25 @@ from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
 from ..theme_system import get_theme
 
 # Checkbox styles
-alias CHECKBOX_SQUARE = 0
-alias CHECKBOX_ROUND = 1
+comptime CHECKBOX_SQUARE = 0
+comptime CHECKBOX_ROUND = 1
 
 # Check mark styles
-alias CHECK_MARK = 0
-alias CHECK_FILLED = 1
-alias CHECK_DOT = 2
+comptime CHECK_MARK = 0
+comptime CHECK_FILLED = 1
+comptime CHECK_DOT = 2
 
-struct CheckboxInt(BaseWidgetInt):
+struct CheckboxInt(WidgetInt, Copyable, Movable):
     """Interactive checkbox widget using integer coordinates."""
-    
+
+    # Inlined BaseWidgetInt fields (struct inheritance is not supported).
+    var bounds: RectInt
+    var visible: Bool
+    var enabled: Bool
+    var background_color: ColorInt
+    var border_color: ColorInt
+    var border_width: Int32
+
     var text: String
     var text_color: ColorInt
     var check_color: ColorInt
@@ -34,13 +42,19 @@ struct CheckboxInt(BaseWidgetInt):
     var check_style: Int32  # CHECK_MARK, CHECK_FILLED, or CHECK_DOT
     var use_check_background: Bool
     
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32, height: Int32, text: String, 
+    fn __init__(out self, x: Int32, y: Int32, width: Int32, height: Int32, text: String,
                 style: Int32 = CHECKBOX_SQUARE, check_style: Int32 = CHECK_FILLED):
         """Initialize checkbox."""
-        self.super().__init__(x, y, width, height)
+        # Inlined BaseWidgetInt.__init__
+        self.bounds = RectInt(x, y, width, height)
+        self.visible = True
+        self.enabled = True
+        self.background_color = ColorInt(230, 230, 230, 255)
+        self.border_color = ColorInt(128, 128, 128, 255)
+        self.border_width = 1
         self.text = text
         # Set colors using theme system
-        let theme = get_theme()
+        var theme = get_theme()
         self.text_color = theme.primary_text
         self.check_color = theme.checkbox_mark
         self.check_background_color = theme.checkbox_checked_bg
@@ -59,8 +73,43 @@ struct CheckboxInt(BaseWidgetInt):
         self.background_color = theme.checkbox_background
         self.border_color = theme.primary_border
         self.border_width = 2
-    
-    fn set_text(inout self, text: String):
+
+    # Inlined BaseWidgetInt methods (struct inheritance is not supported).
+    fn get_bounds(self) -> RectInt:
+        return self.bounds
+
+    fn set_bounds(mut self, bounds: RectInt):
+        self.bounds = bounds
+
+    fn is_visible(self) -> Bool:
+        return self.visible
+
+    fn set_visible(mut self, visible: Bool):
+        self.visible = visible
+
+    fn is_enabled(self) -> Bool:
+        return self.enabled
+
+    fn set_enabled(mut self, enabled: Bool):
+        self.enabled = enabled
+
+    fn contains_point(self, point: PointInt) -> Bool:
+        return self.bounds.contains(point)
+
+    fn render_background(self, ctx: RenderingContextInt):
+        if not self.visible:
+            return
+        _ = ctx.set_color(self.background_color.r, self.background_color.g,
+                          self.background_color.b, self.background_color.a)
+        _ = ctx.draw_filled_rectangle(self.bounds.x, self.bounds.y,
+                                      self.bounds.width, self.bounds.height)
+        if self.border_width > 0:
+            _ = ctx.set_color(self.border_color.r, self.border_color.g,
+                              self.border_color.b, self.border_color.a)
+            _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
+                                   self.bounds.width, self.bounds.height)
+
+    fn set_text(mut self, text: String):
         """Set checkbox text."""
         self.text = text
     
@@ -68,26 +117,26 @@ struct CheckboxInt(BaseWidgetInt):
         """Get checkbox state."""
         return self.checked
     
-    fn set_checked(inout self, checked: Bool):
+    fn set_checked(mut self, checked: Bool):
         """Set checkbox state."""
         self.checked = checked
     
-    fn toggle(inout self):
+    fn toggle(mut self):
         """Toggle checkbox state."""
         self.checked = not self.checked
     
     fn get_box_rect(self) -> RectInt:
         """Get the checkbox box rectangle."""
-        let center_y = self.bounds.y + (self.bounds.height - self.box_size) // 2
+        var center_y = self.bounds.y + (self.bounds.height - self.box_size) // 2
         return RectInt(self.bounds.x, center_y, self.box_size, self.box_size)
     
-    fn handle_mouse_event(inout self, event: MouseEventInt) -> Bool:
+    fn handle_mouse_event(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse events."""
         if not self.visible or not self.enabled:
             return False
         
-        let point = PointInt(event.x, event.y)
-        let inside = self.contains_point(point)
+        var point = PointInt(event.x, event.y)
+        var inside = self.contains_point(point)
         
         # Update hover state
         self.is_hovering = inside
@@ -106,7 +155,7 @@ struct CheckboxInt(BaseWidgetInt):
         
         return inside
     
-    fn handle_key_event(inout self, event: KeyEventInt) -> Bool:
+    fn handle_key_event(mut self, event: KeyEventInt) -> Bool:
         """Handle key events (Space to toggle)."""
         if not self.visible or not self.enabled:
             return False
@@ -123,10 +172,10 @@ struct CheckboxInt(BaseWidgetInt):
         if not self.visible:
             return
         
-        let box_rect = self.get_box_rect()
-        let center_x = box_rect.x + box_rect.width // 2
-        let center_y = box_rect.y + box_rect.height // 2
-        let radius = self.box_size // 2
+        var box_rect = self.get_box_rect()
+        var center_x = box_rect.x + box_rect.width // 2
+        var center_y = box_rect.y + box_rect.height // 2
+        var radius = self.box_size // 2
         
         # Choose background color based on state
         var bg_color = self.background_color
@@ -147,22 +196,22 @@ struct CheckboxInt(BaseWidgetInt):
         
         # Draw border
         if self.border_width > 0:
-            let border_intensity: Int32 = 200 if self.enabled else 128
-            let border_r = (self.border_color.r * border_intensity) // 255
-            let border_g = (self.border_color.g * border_intensity) // 255
-            let border_b = (self.border_color.b * border_intensity) // 255
+            var border_intensity: Int32 = 200 if self.enabled else 128
+            var border_r = (self.border_color.r * border_intensity) // 255
+            var border_g = (self.border_color.g * border_intensity) // 255
+            var border_b = (self.border_color.b * border_intensity) // 255
             _ = ctx.set_color(border_r, border_g, border_b, self.border_color.a)
             
             if self.style == CHECKBOX_ROUND:
                 # Draw round border (simple approximation)
-                let border_radius = radius + 1
+                var border_radius = radius + 1
                 # Draw border as multiple circles for rounded effect
                 _ = ctx.draw_filled_circle(center_x, center_y - border_radius, 1, 4)
                 _ = ctx.draw_filled_circle(center_x + border_radius, center_y, 1, 4)
                 _ = ctx.draw_filled_circle(center_x, center_y + border_radius, 1, 4)
                 _ = ctx.draw_filled_circle(center_x - border_radius, center_y, 1, 4)
                 # Diagonal points
-                let diag_offset = (border_radius * 7) // 10
+                var diag_offset = (border_radius * 7) // 10
                 _ = ctx.draw_filled_circle(center_x + diag_offset, center_y - diag_offset, 1, 4)
                 _ = ctx.draw_filled_circle(center_x + diag_offset, center_y + diag_offset, 1, 4)
                 _ = ctx.draw_filled_circle(center_x - diag_offset, center_y + diag_offset, 1, 4)
@@ -180,17 +229,17 @@ struct CheckboxInt(BaseWidgetInt):
                 pass
             elif self.check_style == CHECK_DOT:
                 # Draw a dot in the center
-                let dot_radius = self.box_size // 4
+                var dot_radius = self.box_size // 4
                 _ = ctx.draw_filled_circle(center_x, center_y, dot_radius, 8)
             else:
                 # Draw traditional checkmark
-                let check_margin = self.box_size // 4
-                let check_x1 = box_rect.x + check_margin
-                let check_y1 = box_rect.y + self.box_size // 2
-                let check_x2 = box_rect.x + self.box_size // 2
-                let check_y2 = box_rect.y + self.box_size - check_margin
-                let check_x3 = box_rect.x + self.box_size - check_margin
-                let check_y3 = box_rect.y + check_margin
+                var check_margin = self.box_size // 4
+                var check_x1 = box_rect.x + check_margin
+                var check_y1 = box_rect.y + self.box_size // 2
+                var check_x2 = box_rect.x + self.box_size // 2
+                var check_y2 = box_rect.y + self.box_size - check_margin
+                var check_x3 = box_rect.x + self.box_size - check_margin
+                var check_y3 = box_rect.y + check_margin
                 
                 # Draw checkmark as thick lines
                 for i in range(3):
@@ -199,35 +248,35 @@ struct CheckboxInt(BaseWidgetInt):
         
         # Draw text
         if len(self.text) > 0:
-            let text_alpha: Int32 = 255 if self.enabled else 128
+            var text_alpha: Int32 = 255 if self.enabled else 128
             _ = ctx.set_color(self.text_color.r, self.text_color.g, 
                              self.text_color.b, (self.text_color.a * text_alpha) // 255)
             
-            let text_x = self.bounds.x + self.text_offset
-            let text_y = self.bounds.y + (self.bounds.height - self.font_size) // 2
+            var text_x = self.bounds.x + self.text_offset
+            var text_y = self.bounds.y + (self.bounds.height - self.font_size) // 2
             _ = ctx.draw_text(self.text, text_x, text_y, self.font_size)
     
-    fn set_style(inout self, style: Int32):
+    fn set_style(mut self, style: Int32):
         """Set checkbox style (CHECKBOX_SQUARE or CHECKBOX_ROUND)."""
         self.style = style
     
-    fn set_check_style(inout self, check_style: Int32):
+    fn set_check_style(mut self, check_style: Int32):
         """Set check mark style (CHECK_MARK, CHECK_FILLED, or CHECK_DOT)."""
         self.check_style = check_style
     
-    fn set_check_background_color(inout self, color: ColorInt):
+    fn set_check_background_color(mut self, color: ColorInt):
         """Set the background color when checked."""
         self.check_background_color = color
     
-    fn set_use_check_background(inout self, use_background: Bool):
+    fn set_use_check_background(mut self, use_background: Bool):
         """Enable/disable colored background when checked."""
         self.use_check_background = use_background
     
-    fn set_check_color(inout self, color: ColorInt):
+    fn set_check_color(mut self, color: ColorInt):
         """Set the check mark color."""
         self.check_color = color
     
-    fn update(inout self):
+    fn update(mut self):
         """Update checkbox state."""
         # Nothing to update for basic checkbox
         pass
@@ -243,16 +292,16 @@ fn create_round_checkbox_int(x: Int32, y: Int32, width: Int32, height: Int32, te
 
 fn create_checkbox_int_with_mark(x: Int32, y: Int32, width: Int32, height: Int32, text: String, round: Bool = False) -> CheckboxInt:
     """Create a checkbox with traditional check mark (no background fill)."""
-    let style = CHECKBOX_ROUND if round else CHECKBOX_SQUARE
+    var style = CHECKBOX_ROUND if round else CHECKBOX_SQUARE
     var checkbox = CheckboxInt(x, y, width, height, text, style, CHECK_MARK)
     checkbox.set_use_check_background(False)
-    let theme = get_theme()
+    var theme = get_theme()
     checkbox.set_check_color(theme.checkbox_mark_color)
-    return checkbox
+    return checkbox^
 
 fn create_checkbox_int_checked(x: Int32, y: Int32, width: Int32, height: Int32, text: String, round: Bool = False) -> CheckboxInt:
     """Create a checkbox that starts checked."""
-    let style = CHECKBOX_ROUND if round else CHECKBOX_SQUARE
+    var style = CHECKBOX_ROUND if round else CHECKBOX_SQUARE
     var checkbox = CheckboxInt(x, y, width, height, text, style, CHECK_FILLED)
     checkbox.set_checked(True)
-    return checkbox
+    return checkbox^

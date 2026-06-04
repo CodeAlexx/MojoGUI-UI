@@ -5,38 +5,46 @@ Modal dialog window using integer coordinates.
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
 from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
-from ..theme_state_integration import get_theme
+from ..theme_system import get_theme
 
 # Dialog types
-alias DIALOG_INFO = 0
-alias DIALOG_WARNING = 1
-alias DIALOG_ERROR = 2
-alias DIALOG_QUESTION = 3
-alias DIALOG_CUSTOM = 4
+comptime DIALOG_INFO = 0
+comptime DIALOG_WARNING = 1
+comptime DIALOG_ERROR = 2
+comptime DIALOG_QUESTION = 3
+comptime DIALOG_CUSTOM = 4
 
 # Dialog buttons
-alias DIALOG_OK = 0
-alias DIALOG_CANCEL = 1
-alias DIALOG_YES = 2
-alias DIALOG_NO = 3
-alias DIALOG_CLOSE = 4
+comptime DIALOG_OK = 0
+comptime DIALOG_CANCEL = 1
+comptime DIALOG_YES = 2
+comptime DIALOG_NO = 3
+comptime DIALOG_CLOSE = 4
 
-struct DialogButtonInt:
+struct DialogButtonInt(ImplicitlyCopyable, Movable):
     """Dialog button definition."""
     var text: String
     var button_type: Int32
     var rect: RectInt
     var enabled: Bool
     
-    fn __init__(inout self, text: String, button_type: Int32):
+    fn __init__(out self, text: String, button_type: Int32):
         self.text = text
         self.button_type = button_type
         self.rect = RectInt(0, 0, 0, 0)
         self.enabled = True
 
-struct DialogInt(BaseWidgetInt):
+struct DialogInt(WidgetInt, Copyable, Movable):
     """Modal dialog widget using integer coordinates."""
-    
+
+    # Inlined BaseWidgetInt fields (struct inheritance is not supported).
+    var bounds: RectInt
+    var visible: Bool
+    var enabled: Bool
+    var background_color: ColorInt
+    var border_color: ColorInt
+    var border_width: Int32
+
     var title: String
     var message: String
     var dialog_type: Int32
@@ -65,10 +73,16 @@ struct DialogInt(BaseWidgetInt):
     var title_font_size: Int32
     var hover_button: Int32
     
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32, height: Int32, 
+    fn __init__(out self, x: Int32, y: Int32, width: Int32, height: Int32,
                title: String, message: String, dialog_type: Int32 = DIALOG_INFO):
         """Initialize dialog."""
-        self.super().__init__(x, y, width, height)
+        # Inlined BaseWidgetInt.__init__
+        self.bounds = RectInt(x, y, width, height)
+        self.visible = True
+        self.enabled = True
+        self.background_color = ColorInt(230, 230, 230, 255)
+        self.border_color = ColorInt(128, 128, 128, 255)
+        self.border_width = 1
         self.title = title
         self.message = message
         self.dialog_type = dialog_type
@@ -80,7 +94,7 @@ struct DialogInt(BaseWidgetInt):
         self.drag_offset = PointInt(0, 0)
         
         # Colors based on dialog type
-        let theme = get_theme()
+        var theme = get_theme()
         self.title_color = theme.selection_text
         self.message_color = theme.primary_text
         self.button_color = theme.widget_background
@@ -113,50 +127,82 @@ struct DialogInt(BaseWidgetInt):
         self.background_color = theme.widget_background
         self.border_color = theme.primary_border
         self.border_width = 2
-    
-    fn add_button(inout self, text: String, button_type: Int32):
+
+    # Inlined BaseWidgetInt methods (struct inheritance is not supported).
+    fn get_bounds(self) -> RectInt:
+        return self.bounds
+
+    fn set_bounds(mut self, bounds: RectInt):
+        self.bounds = bounds
+
+    fn set_visible(mut self, visible: Bool):
+        self.visible = visible
+
+    fn is_enabled(self) -> Bool:
+        return self.enabled
+
+    fn set_enabled(mut self, enabled: Bool):
+        self.enabled = enabled
+
+    fn contains_point(self, point: PointInt) -> Bool:
+        return self.bounds.contains(point)
+
+    fn render_background(self, ctx: RenderingContextInt):
+        if not self.visible:
+            return
+        _ = ctx.set_color(self.background_color.r, self.background_color.g,
+                          self.background_color.b, self.background_color.a)
+        _ = ctx.draw_filled_rectangle(self.bounds.x, self.bounds.y,
+                                      self.bounds.width, self.bounds.height)
+        if self.border_width > 0:
+            _ = ctx.set_color(self.border_color.r, self.border_color.g,
+                              self.border_color.b, self.border_color.a)
+            _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
+                                   self.bounds.width, self.bounds.height)
+
+    fn add_button(mut self, text: String, button_type: Int32):
         """Add button to dialog."""
         self.buttons.append(DialogButtonInt(text, button_type))
         self.layout_buttons()
     
-    fn add_ok_button(inout self):
+    fn add_ok_button(mut self):
         """Add OK button."""
         self.add_button("OK", DIALOG_OK)
-    
-    fn add_cancel_button(inout self):
+
+    fn add_cancel_button(mut self):
         """Add Cancel button."""
         self.add_button("Cancel", DIALOG_CANCEL)
-    
-    fn add_yes_no_buttons(inout self):
+
+    fn add_yes_no_buttons(mut self):
         """Add Yes and No buttons."""
         self.add_button("Yes", DIALOG_YES)
         self.add_button("No", DIALOG_NO)
-    
-    fn add_ok_cancel_buttons(inout self):
+
+    fn add_ok_cancel_buttons(mut self):
         """Add OK and Cancel buttons."""
         self.add_ok_button()
         self.add_cancel_button()
-    
-    fn layout_buttons(inout self):
+
+    fn layout_buttons(mut self):
         """Layout buttons at bottom of dialog."""
-        let button_count = len(self.buttons)
+        var button_count = len(self.buttons)
         if button_count == 0:
             return
         
-        let total_width = button_count * self.button_width + (button_count - 1) * 10
-        let start_x = self.bounds.x + (self.bounds.width - total_width) // 2
-        let button_y = self.bounds.y + self.bounds.height - self.margin - self.button_height
+        var total_width = button_count * self.button_width + (button_count - 1) * 10
+        var start_x = self.bounds.x + (self.bounds.width - total_width) // 2
+        var button_y = self.bounds.y + self.bounds.height - self.margin - self.button_height
         
         for i in range(button_count):
-            let button_x = start_x + i * (self.button_width + 10)
+            var button_x = start_x + i * (self.button_width + 10)
             self.buttons[i].rect = RectInt(button_x, button_y, self.button_width, self.button_height)
     
-    fn show(inout self):
+    fn show(mut self):
         """Show the dialog."""
         self.is_open = True
         self.result = -1
-    
-    fn hide(inout self):
+
+    fn hide(mut self):
         """Hide the dialog."""
         self.is_open = False
     
@@ -186,23 +232,23 @@ struct DialogInt(BaseWidgetInt):
                 return i
         return -1
     
-    fn handle_mouse_event(inout self, event: MouseEventInt) -> Bool:
+    fn handle_mouse_event(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse events."""
         if not self.is_visible():
             return False
         
-        let point = PointInt(event.x, event.y)
+        var point = PointInt(event.x, event.y)
         
         if event.pressed:
             # Check title bar for dragging
-            let title_rect = self.get_title_rect()
+            var title_rect = self.get_title_rect()
             if title_rect.contains(point):
                 self.is_dragging = True
                 self.drag_offset = PointInt(point.x - self.bounds.x, point.y - self.bounds.y)
                 return True
             
             # Check buttons
-            let button_index = self.button_from_point(point)
+            var button_index = self.button_from_point(point)
             if button_index >= 0 and self.buttons[button_index].enabled:
                 self.result = self.buttons[button_index].button_type
                 self.hide()
@@ -227,7 +273,7 @@ struct DialogInt(BaseWidgetInt):
         
         return self.is_modal and self.contains_point(point)
     
-    fn handle_key_event(inout self, event: KeyEventInt) -> Bool:
+    fn handle_key_event(mut self, event: KeyEventInt) -> Bool:
         """Handle key events."""
         if not self.is_visible():
             return False
@@ -281,7 +327,7 @@ struct DialogInt(BaseWidgetInt):
         _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y, self.bounds.width, self.bounds.height)
         
         # Draw title bar
-        let title_rect = self.get_title_rect()
+        var title_rect = self.get_title_rect()
         _ = ctx.set_color(self.title_background.r, self.title_background.g,
                          self.title_background.b, self.title_background.a)
         _ = ctx.draw_filled_rectangle(title_rect.x, title_rect.y, title_rect.width, title_rect.height)
@@ -289,19 +335,19 @@ struct DialogInt(BaseWidgetInt):
         # Draw title text
         _ = ctx.set_color(self.title_color.r, self.title_color.g,
                          self.title_color.b, self.title_color.a)
-        let title_x = title_rect.x + 10
-        let title_y = title_rect.y + (title_rect.height - self.title_font_size) // 2
+        var title_x = title_rect.x + 10
+        var title_y = title_rect.y + (title_rect.height - self.title_font_size) // 2
         _ = ctx.draw_text(self.title, title_x, title_y, self.title_font_size)
         
         # Draw message
-        let content_rect = self.get_content_rect()
+        var content_rect = self.get_content_rect()
         _ = ctx.set_color(self.message_color.r, self.message_color.g,
                          self.message_color.b, self.message_color.a)
         
         # Simple word wrapping (basic implementation)
-        let lines = self.wrap_text(self.message, content_rect.width)
+        var lines = self.wrap_text(self.message, content_rect.width)
         for i in range(len(lines)):
-            let line_y = content_rect.y + i * (self.font_size + 4)
+            var line_y = content_rect.y + i * (self.font_size + 4)
             _ = ctx.draw_text(lines[i], content_rect.x, line_y, self.font_size)
         
         # Draw buttons
@@ -310,11 +356,11 @@ struct DialogInt(BaseWidgetInt):
     
     fn render_button(self, ctx: RenderingContextInt, button_index: Int32):
         """Render individual button."""
-        let button = self.buttons[button_index]
-        let is_hover = (button_index == self.hover_button)
+        var button = self.buttons[button_index]
+        var is_hover = (button_index == self.hover_button)
         
         # Draw button background
-        let button_color = self.button_hover_color if is_hover else self.button_color
+        var button_color = self.button_hover_color if is_hover else self.button_color
         _ = ctx.set_color(button_color.r, button_color.g, button_color.b, button_color.a)
         _ = ctx.draw_filled_rectangle(button.rect.x, button.rect.y, button.rect.width, button.rect.height)
         
@@ -324,12 +370,12 @@ struct DialogInt(BaseWidgetInt):
         _ = ctx.draw_rectangle(button.rect.x, button.rect.y, button.rect.width, button.rect.height)
         
         # Draw button text
-        let theme = get_theme()
-        let text_color = self.button_text_color if button.enabled else theme.secondary_text
+        var theme = get_theme()
+        var text_color = self.button_text_color if button.enabled else theme.secondary_text
         _ = ctx.set_color(text_color.r, text_color.g, text_color.b, text_color.a)
         
-        let text_x = button.rect.x + (button.rect.width - len(button.text) * 6) // 2
-        let text_y = button.rect.y + (button.rect.height - self.font_size) // 2
+        var text_x = button.rect.x + (button.rect.width - len(button.text) * 6) // 2
+        var text_y = button.rect.y + (button.rect.height - self.font_size) // 2
         _ = ctx.draw_text(button.text, text_x, text_y, self.font_size)
     
     fn wrap_text(self, text: String, max_width: Int32) -> List[String]:
@@ -338,32 +384,32 @@ struct DialogInt(BaseWidgetInt):
         
         # Simple implementation - just split on spaces and create lines
         # In a real implementation, this would be more sophisticated
-        let char_width = 6  # Rough character width
-        let chars_per_line = max_width // char_width
+        var char_width = 6  # Rough character width
+        var chars_per_line = max_width // char_width
         
-        if len(text) <= chars_per_line:
+        if len(text) <= Int(chars_per_line):
             lines.append(text)
         else:
             # Simple word wrapping
             var current_line = ""
-            let words = text.split(" ")
+            var words = text.split(" ")
             
             for i in range(len(words)):
-                if len(current_line) + len(words[i]) + 1 <= chars_per_line:
+                if len(current_line) + len(words[i]) + 1 <= Int(chars_per_line):
                     if len(current_line) > 0:
                         current_line += " "
-                    current_line += words[i]
+                    current_line += String(words[i])
                 else:
                     if len(current_line) > 0:
                         lines.append(current_line)
-                    current_line = words[i]
-            
+                    current_line = String(words[i])
+
             if len(current_line) > 0:
                 lines.append(current_line)
-        
-        return lines
+
+        return lines^
     
-    fn update(inout self):
+    fn update(mut self):
         """Update dialog state."""
         # Nothing special to update for basic dialog
         pass
@@ -374,25 +420,25 @@ fn create_info_dialog_int(x: Int32, y: Int32, width: Int32, height: Int32,
     """Create an info dialog with OK button."""
     var dialog = DialogInt(x, y, width, height, title, message, DIALOG_INFO)
     dialog.add_ok_button()
-    return dialog
+    return dialog^
 
 fn create_warning_dialog_int(x: Int32, y: Int32, width: Int32, height: Int32,
                             title: String, message: String) -> DialogInt:
     """Create a warning dialog with OK button."""
     var dialog = DialogInt(x, y, width, height, title, message, DIALOG_WARNING)
     dialog.add_ok_button()
-    return dialog
+    return dialog^
 
 fn create_error_dialog_int(x: Int32, y: Int32, width: Int32, height: Int32,
                           title: String, message: String) -> DialogInt:
     """Create an error dialog with OK button."""
     var dialog = DialogInt(x, y, width, height, title, message, DIALOG_ERROR)
     dialog.add_ok_button()
-    return dialog
+    return dialog^
 
 fn create_question_dialog_int(x: Int32, y: Int32, width: Int32, height: Int32,
                              title: String, message: String) -> DialogInt:
     """Create a question dialog with Yes/No buttons."""
     var dialog = DialogInt(x, y, width, height, title, message, DIALOG_QUESTION)
     dialog.add_yes_no_buttons()
-    return dialog
+    return dialog^

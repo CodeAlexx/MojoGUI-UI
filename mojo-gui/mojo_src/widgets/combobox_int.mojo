@@ -7,35 +7,45 @@ Professional dropdown list with autocomplete, filtering, and custom item renderi
 from sys.ffi import DLHandle, DLSymbol
 from memory import alloc, UnsafePointer
 from builtin.type_aliases import MutExternalOrigin
-from ..widget_int import BaseWidgetInt
+from ..rendering_int import RenderingContextInt, ColorInt, PointInt, RectInt
 
 # Constants
-alias MAX_COMBO_ITEMS: Int32 = 256
-alias MAX_VISIBLE_ITEMS: Int32 = 8
-alias ITEM_HEIGHT: Int32 = 25
-alias ARROW_WIDTH: Int32 = 20
+comptime MAX_COMBO_ITEMS: Int32 = 256
+comptime MAX_VISIBLE_ITEMS: Int32 = 8
+comptime ITEM_HEIGHT: Int32 = 25
+comptime ARROW_WIDTH: Int32 = 20
 
 # Events
-alias EVENT_COMBO_SELECTION_CHANGED: Int32 = 1101
-alias EVENT_COMBO_DROPDOWN_OPENED: Int32 = 1102
-alias EVENT_COMBO_DROPDOWN_CLOSED: Int32 = 1103
+comptime EVENT_COMBO_SELECTION_CHANGED: Int32 = 1101
+comptime EVENT_COMBO_DROPDOWN_OPENED: Int32 = 1102
+comptime EVENT_COMBO_DROPDOWN_CLOSED: Int32 = 1103
 
-struct ComboItem:
+struct ComboItem(Copyable, Movable):
     """Individual item in a ComboBox"""
     var text: String
     var data_id: Int32
     var enabled: Bool
-    
-    fn __init__(inout self, text: String, data_id: Int32 = 0, enabled: Bool = True):
+
+    fn __init__(out self, text: String, data_id: Int32 = 0, enabled: Bool = True):
         self.text = text
         self.data_id = data_id
         self.enabled = enabled
 
-struct ComboBoxInt(BaseWidgetInt):
+struct ComboBoxInt(Copyable, Movable):
     """
     Professional ComboBox widget with dropdown list, autocomplete, and filtering
     Supports custom item rendering and extensive user interaction
     """
+    # Inlined BaseWidgetInt fields (struct inheritance is not supported).
+    var bounds: RectInt
+    var visible: Bool
+    var enabled: Bool
+    var background_color: ColorInt
+    var border_color: ColorInt
+    var border_width: Int32
+
+    var focused: Bool
+
     var items: List[ComboItem]
     var selected_index: Int32
     var dropdown_visible: Bool
@@ -46,10 +56,20 @@ struct ComboBoxInt(BaseWidgetInt):
     var dropdown_height: Int32
     var filter_text: String
     var show_filter: Bool
-    
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32, height: Int32, 
+
+    fn __init__(out self, x: Int32, y: Int32, width: Int32, height: Int32,
                editable: Bool = False):
         """Initialize ComboBox with position, size and editability"""
+        # Inlined BaseWidgetInt.__init__
+        self.bounds = RectInt(x, y, width, height)
+        self.visible = True
+        self.enabled = True
+        self.background_color = ColorInt(230, 230, 230, 255)
+        self.border_color = ColorInt(128, 128, 128, 255)
+        self.border_width = 1
+
+        self.focused = False
+
         self.items = List[ComboItem]()
         self.selected_index = -1
         self.dropdown_visible = False
@@ -58,28 +78,71 @@ struct ComboBoxInt(BaseWidgetInt):
         self.scroll_position = 0
         self.hover_item = -1
         self.dropdown_height = 0
-        self.filter_text = ""
+        self.filter_text = String("")
         self.show_filter = False
-        super().__init__(x, y, width, height, "combobox")
 
-    fn add_item(inout self, text: String, data_id: Int32 = 0, enabled: Bool = True):
+    # Inlined BaseWidgetInt methods (struct inheritance is not supported).
+    fn get_bounds(self) -> RectInt:
+        return self.bounds
+
+    fn set_bounds(mut self, bounds: RectInt):
+        self.bounds = bounds
+
+    fn is_visible(self) -> Bool:
+        return self.visible
+
+    fn set_visible(mut self, visible: Bool):
+        self.visible = visible
+
+    fn is_enabled(self) -> Bool:
+        return self.enabled
+
+    fn set_enabled(mut self, enabled: Bool):
+        self.enabled = enabled
+
+    fn contains_point(self, point: PointInt) -> Bool:
+        return self.bounds.contains(point)
+
+    fn render_background(self, ctx: RenderingContextInt):
+        if not self.visible:
+            return
+        _ = ctx.set_color(self.background_color.r, self.background_color.g,
+                          self.background_color.b, self.background_color.a)
+        _ = ctx.draw_filled_rectangle(self.bounds.x, self.bounds.y,
+                                      self.bounds.width, self.bounds.height)
+        if self.border_width > 0:
+            _ = ctx.set_color(self.border_color.r, self.border_color.g,
+                              self.border_color.b, self.border_color.a)
+            _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
+                                   self.bounds.width, self.bounds.height)
+
+    fn is_point_inside(self, px: Int32, py: Int32) -> Bool:
+        """Check if a point is within the widget bounds."""
+        return (px >= self.bounds.x and px <= self.bounds.x + self.bounds.width and
+                py >= self.bounds.y and py <= self.bounds.y + self.bounds.height)
+
+    fn trigger_event(self, event_type: Int32, event_data: Int32):
+        """Event dispatch hook (no-op placeholder)."""
+        pass
+
+    fn add_item(mut self, text: String, data_id: Int32 = 0, enabled: Bool = True):
         """Add an item to the combobox"""
         self.items.append(ComboItem(text, data_id, enabled))
         self._update_dropdown_height()
 
-    fn insert_item(inout self, index: Int32, text: String, data_id: Int32 = 0, enabled: Bool = True):
+    fn insert_item(mut self, index: Int32, text: String, data_id: Int32 = 0, enabled: Bool = True):
         """Insert an item at specific index"""
         if index >= 0 and index <= len(self.items):
-            self.items.insert(index, ComboItem(text, data_id, enabled))
+            self.items.insert(Int(index), ComboItem(text, data_id, enabled))
             self._update_dropdown_height()
             # Adjust selected index if needed
             if self.selected_index >= index:
                 self.selected_index += 1
 
-    fn remove_item(inout self, index: Int32):
+    fn remove_item(mut self, index: Int32):
         """Remove item at index"""
         if index >= 0 and index < len(self.items):
-            _ = self.items.pop(index)
+            _ = self.items.pop(Int(index))
             self._update_dropdown_height()
             # Adjust selected index
             if self.selected_index == index:
@@ -87,13 +150,13 @@ struct ComboBoxInt(BaseWidgetInt):
             elif self.selected_index > index:
                 self.selected_index -= 1
 
-    fn clear_items(inout self):
+    fn clear_items(mut self):
         """Remove all items"""
         self.items.clear()
         self.selected_index = -1
         self.dropdown_height = 0
 
-    fn set_selected_index(inout self, index: Int32):
+    fn set_selected_index(mut self, index: Int32):
         """Set selected item by index"""
         if index >= -1 and index < len(self.items):
             var old_index = self.selected_index
@@ -108,13 +171,13 @@ struct ComboBoxInt(BaseWidgetInt):
     fn get_selected_text(self) -> String:
         """Get text of selected item"""
         if self.selected_index >= 0 and self.selected_index < len(self.items):
-            return self.items[self.selected_index].text
-        return ""
+            return self.items[Int(self.selected_index)].text
+        return String("")
 
     fn get_selected_data_id(self) -> Int32:
         """Get data ID of selected item"""
         if self.selected_index >= 0 and self.selected_index < len(self.items):
-            return self.items[self.selected_index].data_id
+            return self.items[Int(self.selected_index)].data_id
         return 0
 
     fn find_item_by_text(self, text: String) -> Int32:
@@ -124,20 +187,20 @@ struct ComboBoxInt(BaseWidgetInt):
                 return i
         return -1
 
-    fn set_filter(inout self, filter_text: String):
+    fn set_filter(mut self, filter_text: String):
         """Set filter text for autocomplete/filtering"""
         self.filter_text = filter_text
         self.show_filter = len(filter_text) > 0
 
-    fn _update_dropdown_height(inout self):
+    fn _update_dropdown_height(mut self):
         """Update dropdown height based on items"""
-        var visible_items = min(len(self.items), self.max_visible_items)
+        var visible_items = min(Int32(len(self.items)), self.max_visible_items)
         self.dropdown_height = visible_items * ITEM_HEIGHT
 
     fn _get_filtered_items(self) -> List[Int32]:
         """Get list of item indices that match current filter"""
         var filtered_indices = List[Int32]()
-        
+
         if not self.show_filter or len(self.filter_text) == 0:
             # No filter - show all items
             for i in range(len(self.items)):
@@ -148,10 +211,10 @@ struct ComboBoxInt(BaseWidgetInt):
             for i in range(len(self.items)):
                 if filter_lower in self.items[i].text.lower():
                     filtered_indices.append(i)
-        
+
         return filtered_indices
 
-    fn open_dropdown(inout self):
+    fn open_dropdown(mut self):
         """Open the dropdown list"""
         if not self.dropdown_visible:
             self.dropdown_visible = True
@@ -160,14 +223,14 @@ struct ComboBoxInt(BaseWidgetInt):
             self._update_dropdown_height()
             self.trigger_event(EVENT_COMBO_DROPDOWN_OPENED, 0)
 
-    fn close_dropdown(inout self):
+    fn close_dropdown(mut self):
         """Close the dropdown list"""
         if self.dropdown_visible:
             self.dropdown_visible = False
             self.hover_item = -1
             self.trigger_event(EVENT_COMBO_DROPDOWN_CLOSED, 0)
 
-    fn handle_mouse_down(inout self, mouse_x: Int32, mouse_y: Int32) -> Bool:
+    fn handle_mouse_down(mut self, mouse_x: Int32, mouse_y: Int32) -> Bool:
         """Handle mouse down events"""
         # Check if clicking on dropdown arrow or main area
         if self.is_point_inside(mouse_x, mouse_y) and self.enabled:
@@ -176,59 +239,59 @@ struct ComboBoxInt(BaseWidgetInt):
             else:
                 self.close_dropdown()
             return True
-        
+
         # Check if clicking in dropdown area
         if self.dropdown_visible:
-            var dropdown_y = self.y + self.height
-            if (mouse_x >= self.x and mouse_x <= self.x + self.width and
+            var dropdown_y = self.bounds.y + self.bounds.height
+            if (mouse_x >= self.bounds.x and mouse_x <= self.bounds.x + self.bounds.width and
                 mouse_y >= dropdown_y and mouse_y <= dropdown_y + self.dropdown_height):
-                
+
                 # Calculate which item was clicked
                 var item_offset = (mouse_y - dropdown_y) // ITEM_HEIGHT + self.scroll_position
                 var filtered_indices = self._get_filtered_items()
-                
+
                 if item_offset >= 0 and item_offset < len(filtered_indices):
-                    var actual_index = filtered_indices[item_offset]
-                    if self.items[actual_index].enabled:
+                    var actual_index = filtered_indices[Int(item_offset)]
+                    if self.items[Int(actual_index)].enabled:
                         self.set_selected_index(actual_index)
                         self.close_dropdown()
                         return True
             else:
                 # Clicked outside dropdown - close it
                 self.close_dropdown()
-        
+
         return False
 
-    fn handle_mouse_move(inout self, mouse_x: Int32, mouse_y: Int32):
+    fn handle_mouse_move(mut self, mouse_x: Int32, mouse_y: Int32):
         """Handle mouse movement for hover effects"""
         if not self.dropdown_visible:
             return
-            
-        var dropdown_y = self.y + self.height
-        if (mouse_x >= self.x and mouse_x <= self.x + self.width and
+
+        var dropdown_y = self.bounds.y + self.bounds.height
+        if (mouse_x >= self.bounds.x and mouse_x <= self.bounds.x + self.bounds.width and
             mouse_y >= dropdown_y and mouse_y <= dropdown_y + self.dropdown_height):
-            
+
             var item_offset = (mouse_y - dropdown_y) // ITEM_HEIGHT + self.scroll_position
             var filtered_indices = self._get_filtered_items()
-            
+
             if item_offset >= 0 and item_offset < len(filtered_indices):
-                self.hover_item = filtered_indices[item_offset]
+                self.hover_item = filtered_indices[Int(item_offset)]
             else:
                 self.hover_item = -1
         else:
             self.hover_item = -1
 
-    fn handle_scroll(inout self, delta: Int32):
+    fn handle_scroll(mut self, delta: Int32):
         """Handle mouse wheel scrolling in dropdown"""
         if not self.dropdown_visible:
             return
-            
-        var filtered_indices = self._get_filtered_items()
-        var max_scroll = max(0, len(filtered_indices) - self.max_visible_items)
-        
-        self.scroll_position = max(0, min(max_scroll, self.scroll_position + delta))
 
-    fn handle_key_input(inout self, key_code: Int32) -> Bool:
+        var filtered_indices = self._get_filtered_items()
+        var max_scroll = max(Int32(0), Int32(len(filtered_indices)) - self.max_visible_items)
+
+        self.scroll_position = max(Int32(0), min(max_scroll, self.scroll_position + delta))
+
+    fn handle_key_input(mut self, key_code: Int32) -> Bool:
         """Handle keyboard input"""
         if not self.focused:
             return False
@@ -252,7 +315,7 @@ struct ComboBoxInt(BaseWidgetInt):
                             current_pos = i
                             break
                     if current_pos > 0:
-                        self.set_selected_index(filtered_indices[current_pos - 1])
+                        self.set_selected_index(filtered_indices[Int(current_pos - 1)])
             else:
                 self.open_dropdown()
             return True
@@ -266,7 +329,7 @@ struct ComboBoxInt(BaseWidgetInt):
                             current_pos = i
                             break
                     if current_pos < len(filtered_indices) - 1:
-                        self.set_selected_index(filtered_indices[current_pos + 1])
+                        self.set_selected_index(filtered_indices[Int(current_pos + 1)])
                     elif current_pos == -1:
                         self.set_selected_index(filtered_indices[0])
             else:
@@ -292,7 +355,7 @@ struct ComboBoxInt(BaseWidgetInt):
             _ = set_color(255, 255, 255, 255)  # White background
         else:
             _ = set_color(240, 240, 240, 255)  # Gray when disabled
-        _ = draw_filled_rectangle(self.x, self.y, self.width, self.height)
+        _ = draw_filled_rectangle(self.bounds.x, self.bounds.y, self.bounds.width, self.bounds.height)
 
         # Draw border
         if self.focused:
@@ -301,23 +364,23 @@ struct ComboBoxInt(BaseWidgetInt):
             _ = set_color(100, 150, 255, 255)  # Blue when open
         else:
             _ = set_color(180, 180, 180, 255)  # Gray border
-        _ = draw_rectangle(self.x, self.y, self.width, self.height)
+        _ = draw_rectangle(self.bounds.x, self.bounds.y, self.bounds.width, self.bounds.height)
 
         # Draw selected text
         var display_text = self.get_selected_text()
         if len(display_text) == 0:
-            display_text = "Select..."
+            display_text = String("Select...")
             _ = set_color(150, 150, 150, 255)  # Gray placeholder
         else:
             _ = set_color(0, 0, 0, 255)  # Black text
 
         var text_bytes = display_text.as_bytes()
         var text_ptr = text_bytes.unsafe_ptr().bitcast[Int8]()
-        _ = draw_text(text_ptr, self.x + 8, self.y + self.height // 2 - 6, 12)
+        _ = draw_text(text_ptr, self.bounds.x + 8, self.bounds.y + self.bounds.height // 2 - 6, 12)
 
         # Draw dropdown arrow
-        var arrow_x = self.x + self.width - ARROW_WIDTH + ARROW_WIDTH // 2
-        var arrow_y = self.y + self.height // 2
+        var arrow_x = self.bounds.x + self.bounds.width - ARROW_WIDTH + ARROW_WIDTH // 2
+        var arrow_y = self.bounds.y + self.bounds.height // 2
 
         _ = set_color(100, 100, 100, 255)  # Dark gray arrow
         if self.dropdown_visible:
@@ -331,8 +394,8 @@ struct ComboBoxInt(BaseWidgetInt):
 
         # Draw dropdown separator line
         _ = set_color(200, 200, 200, 255)
-        var sep_x = self.x + self.width - ARROW_WIDTH
-        _ = draw_line(sep_x, self.y + 2, sep_x, self.y + self.height - 2, 1)
+        var sep_x = self.bounds.x + self.bounds.width - ARROW_WIDTH
+        _ = draw_line(sep_x, self.bounds.y + 2, sep_x, self.bounds.y + self.bounds.height - 2, 1)
 
         # Draw dropdown list if visible
         if self.dropdown_visible:
@@ -341,7 +404,7 @@ struct ComboBoxInt(BaseWidgetInt):
         # Draw disabled overlay
         if not self.enabled:
             _ = set_color(255, 255, 255, 128)  # Semi-transparent white
-            _ = draw_filled_rectangle(self.x, self.y, self.width, self.height)
+            _ = draw_filled_rectangle(self.bounds.x, self.bounds.y, self.bounds.width, self.bounds.height)
 
     fn _draw_dropdown(self, lib: DLHandle):
         """Draw the dropdown list"""
@@ -350,45 +413,45 @@ struct ComboBoxInt(BaseWidgetInt):
         var draw_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_rectangle")
         var draw_text = lib.get_function[fn(UnsafePointer[Int8, MutExternalOrigin], Int32, Int32, Int32) -> Int32]("draw_text")
 
-        var dropdown_y = self.y + self.height
+        var dropdown_y = self.bounds.y + self.bounds.height
         var filtered_indices = self._get_filtered_items()
-        
+
         if len(filtered_indices) == 0:
             return
 
         # Draw dropdown background
         _ = set_color(255, 255, 255, 255)  # White background
-        _ = draw_filled_rectangle(self.x, dropdown_y, self.width, self.dropdown_height)
+        _ = draw_filled_rectangle(self.bounds.x, dropdown_y, self.bounds.width, self.dropdown_height)
 
         # Draw dropdown border
         _ = set_color(180, 180, 180, 255)  # Gray border
-        _ = draw_rectangle(self.x, dropdown_y, self.width, self.dropdown_height)
+        _ = draw_rectangle(self.bounds.x, dropdown_y, self.bounds.width, self.dropdown_height)
 
         # Draw visible items
-        var visible_count = min(len(filtered_indices) - self.scroll_position, self.max_visible_items)
-        
-        for i in range(visible_count):
-            var item_index = filtered_indices[self.scroll_position + i]
+        var visible_count = min(Int32(len(filtered_indices)) - self.scroll_position, self.max_visible_items)
+
+        for i in range(Int(visible_count)):
+            var item_index = filtered_indices[Int(self.scroll_position) + i]
             var item_y = dropdown_y + i * ITEM_HEIGHT
-            
+
             # Draw item background
             if item_index == self.hover_item:
                 _ = set_color(230, 240, 255, 255)  # Light blue hover
-                _ = draw_filled_rectangle(self.x + 1, item_y + 1, self.width - 2, ITEM_HEIGHT - 1)
+                _ = draw_filled_rectangle(self.bounds.x + 1, item_y + 1, self.bounds.width - 2, ITEM_HEIGHT - 1)
             elif item_index == self.selected_index:
                 _ = set_color(200, 220, 255, 255)  # Blue selected
-                _ = draw_filled_rectangle(self.x + 1, item_y + 1, self.width - 2, ITEM_HEIGHT - 1)
+                _ = draw_filled_rectangle(self.bounds.x + 1, item_y + 1, self.bounds.width - 2, ITEM_HEIGHT - 1)
 
             # Draw item text
-            if self.items[item_index].enabled:
+            if self.items[Int(item_index)].enabled:
                 _ = set_color(0, 0, 0, 255)  # Black text
             else:
                 _ = set_color(150, 150, 150, 255)  # Gray disabled text
 
-            var item_text = self.items[item_index].text
+            var item_text = self.items[Int(item_index)].text
             var item_bytes = item_text.as_bytes()
             var item_ptr = item_bytes.unsafe_ptr().bitcast[Int8]()
-            _ = draw_text(item_ptr, self.x + 8, item_y + ITEM_HEIGHT // 2 - 6, 12)
+            _ = draw_text(item_ptr, self.bounds.x + 8, item_y + ITEM_HEIGHT // 2 - 6, 12)
 
         # Draw scrollbar if needed
         if len(filtered_indices) > self.max_visible_items:
@@ -398,19 +461,19 @@ struct ComboBoxInt(BaseWidgetInt):
         """Draw scrollbar for dropdown"""
         var set_color = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("set_color")
         var draw_filled_rectangle = lib.get_function[fn(Int32, Int32, Int32, Int32) -> Int32]("draw_filled_rectangle")
-        
+
         var scrollbar_width: Int32 = 12
-        var scrollbar_x = self.x + self.width - scrollbar_width
-        
+        var scrollbar_x = self.bounds.x + self.bounds.width - scrollbar_width
+
         # Draw scrollbar track
         _ = set_color(230, 230, 230, 255)  # Light gray track
         _ = draw_filled_rectangle(scrollbar_x, dropdown_y, scrollbar_width, self.dropdown_height)
-        
+
         # Calculate thumb size and position
-        var total_items = len(filtered_indices)
-        var thumb_height = max(20, (self.max_visible_items * self.dropdown_height) // total_items)
+        var total_items = Int32(len(filtered_indices))
+        var thumb_height = max(Int32(20), (self.max_visible_items * self.dropdown_height) // total_items)
         var thumb_y = dropdown_y + (self.scroll_position * (self.dropdown_height - thumb_height)) // (total_items - self.max_visible_items)
-        
+
         # Draw scrollbar thumb
         _ = set_color(180, 180, 180, 255)  # Gray thumb
         _ = draw_filled_rectangle(scrollbar_x + 2, thumb_y, scrollbar_width - 4, thumb_height)
@@ -429,15 +492,15 @@ fn create_enum_combobox(x: Int32, y: Int32, width: Int32, height: Int32, options
     var combo = ComboBoxInt(x, y, width, height, False)
     for i in range(len(options)):
         combo.add_item(options[i], i)
-    return combo
+    return combo^
 
 fn create_file_type_combobox(x: Int32, y: Int32, width: Int32, height: Int32) -> ComboBoxInt:
     """Create a combobox for common file types"""
     var combo = ComboBoxInt(x, y, width, height, False)
-    combo.add_item("All Files (*.*)", 0)
-    combo.add_item("Text Files (*.txt)", 1)
-    combo.add_item("Mojo Files (*.mojo)", 2)
-    combo.add_item("Python Files (*.py)", 3)
-    combo.add_item("C/C++ Files (*.c, *.cpp)", 4)
-    combo.add_item("Header Files (*.h)", 5)
-    return combo
+    combo.add_item(String("All Files (*.*)"), 0)
+    combo.add_item(String("Text Files (*.txt)"), 1)
+    combo.add_item(String("Mojo Files (*.mojo)"), 2)
+    combo.add_item(String("Python Files (*.py)"), 3)
+    combo.add_item(String("C/C++ Files (*.c, *.cpp)"), 4)
+    combo.add_item(String("Header Files (*.h)"), 5)
+    return combo^

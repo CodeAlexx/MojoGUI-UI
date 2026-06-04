@@ -4,11 +4,12 @@ Table column headers with sorting, resizing, and column menu support.
 """
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
-from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
+from ..widget_int import WidgetInt, BaseWidgetInt
+from .widget_events_int import MouseEventInt, KeyEventInt
 from .widget_constants import *
 from .contextmenu_int import ContextMenuInt
 
-struct ColumnDefinition:
+struct ColumnDefinition(Copyable, Movable):
     """Column configuration and state."""
     var id: String
     var title: String
@@ -24,7 +25,7 @@ struct ColumnDefinition:
     var data_type: Int32   # For appropriate sorting
     var user_data: Int32
     
-    fn __init__(inout self, id: String, title: String, width: Int32 = 100):
+    fn __init__(out self, id: String, title: String, width: Int32 = 100):
         self.id = id
         self.title = title
         self.width = width
@@ -39,9 +40,17 @@ struct ColumnDefinition:
         self.data_type = 0  # String by default
         self.user_data = 0
 
-struct ColumnHeaderInt(BaseWidgetInt):
+struct ColumnHeaderInt(WidgetInt, Copyable, Movable):
     """Column header widget for tables with sorting and resizing."""
-    
+
+    # Inlined BaseWidgetInt fields (struct inheritance is not supported).
+    var bounds: RectInt
+    var visible: Bool
+    var enabled: Bool
+    var background_color: ColorInt
+    var border_color: ColorInt
+    var border_width: Int32
+
     var columns: List[ColumnDefinition]
     var header_height: Int32
     var hover_column: Int32
@@ -74,9 +83,15 @@ struct ColumnHeaderInt(BaseWidgetInt):
     # Column menu
     var column_menu: ContextMenuInt
     
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32, height: Int32 = 28):
-        self.super().__init__(x, y, width, height)
-        
+    fn __init__(out self, x: Int32, y: Int32, width: Int32, height: Int32 = 28):
+        # Inlined BaseWidgetInt.__init__
+        self.bounds = RectInt(x, y, width, height)
+        self.visible = True
+        self.enabled = True
+        self.background_color = ColorInt(230, 230, 230, 255)
+        self.border_color = ColorInt(128, 128, 128, 255)
+        self.border_width = 1
+
         self.columns = List[ColumnDefinition]()
         self.header_height = height
         self.hover_column = -1
@@ -113,8 +128,43 @@ struct ColumnHeaderInt(BaseWidgetInt):
         self.background_color = self.header_bg_color
         self.border_color = ColorInt(180, 180, 180, 255)
         self.border_width = 1
-    
-    fn add_column(inout self, id: String, title: String, width: Int32 = 100,
+
+    # Inlined BaseWidgetInt methods (struct inheritance is not supported).
+    fn get_bounds(self) -> RectInt:
+        return self.bounds
+
+    fn set_bounds(mut self, bounds: RectInt):
+        self.bounds = bounds
+
+    fn is_visible(self) -> Bool:
+        return self.visible
+
+    fn set_visible(mut self, visible: Bool):
+        self.visible = visible
+
+    fn is_enabled(self) -> Bool:
+        return self.enabled
+
+    fn set_enabled(mut self, enabled: Bool):
+        self.enabled = enabled
+
+    fn contains_point(self, point: PointInt) -> Bool:
+        return self.bounds.contains(point)
+
+    fn render_background(self, ctx: RenderingContextInt):
+        if not self.visible:
+            return
+        _ = ctx.set_color(self.background_color.r, self.background_color.g,
+                          self.background_color.b, self.background_color.a)
+        _ = ctx.draw_filled_rectangle(self.bounds.x, self.bounds.y,
+                                      self.bounds.width, self.bounds.height)
+        if self.border_width > 0:
+            _ = ctx.set_color(self.border_color.r, self.border_color.g,
+                              self.border_color.b, self.border_color.a)
+            _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
+                                   self.bounds.width, self.bounds.height)
+
+    fn add_column(mut self, id: String, title: String, width: Int32 = 100,
                   sortable: Bool = True, resizable: Bool = True) -> Int32:
         """Add a column definition."""
         var column = ColumnDefinition(id, title, width)
@@ -123,14 +173,14 @@ struct ColumnHeaderInt(BaseWidgetInt):
         self.columns.append(column)
         return len(self.columns) - 1
     
-    fn remove_column(inout self, column_id: String):
+    fn remove_column(mut self, column_id: String):
         """Remove a column by ID."""
         for i in range(len(self.columns)):
             if self.columns[i].id == column_id:
                 self.columns.remove(i)
                 break
     
-    fn set_column_width(inout self, column_id: String, width: Int32):
+    fn set_column_width(mut self, column_id: String, width: Int32):
         """Set column width."""
         for i in range(len(self.columns)):
             if self.columns[i].id == column_id:
@@ -138,7 +188,7 @@ struct ColumnHeaderInt(BaseWidgetInt):
                                            min(width, self.columns[i].max_width))
                 break
     
-    fn set_column_sort(inout self, column_id: String, sort_order: Int32):
+    fn set_column_sort(mut self, column_id: String, sort_order: Int32):
         """Set column sort order."""
         for i in range(len(self.columns)):
             if self.columns[i].id == column_id:
@@ -161,20 +211,20 @@ struct ColumnHeaderInt(BaseWidgetInt):
     
     fn get_resize_handle_rect(self, index: Int32) -> RectInt:
         """Get rectangle for column resize handle."""
-        let col_rect = self.get_column_rect(index)
-        let handle_x = col_rect.x + col_rect.width - self.resize_handle_width // 2
+        var col_rect = self.get_column_rect(index)
+        var handle_x = col_rect.x + col_rect.width - self.resize_handle_width // 2
         return RectInt(handle_x, col_rect.y, self.resize_handle_width, col_rect.height)
     
     fn hit_test_resize_handle(self, x: Int32, y: Int32) -> Int32:
         """Check if position is over a resize handle."""
         for i in range(len(self.columns)):
             if self.columns[i].visible and self.columns[i].resizable:
-                let handle_rect = self.get_resize_handle_rect(i)
+                var handle_rect = self.get_resize_handle_rect(i)
                 if handle_rect.contains(PointInt(x, y)):
                     return i
         return -1
     
-    fn setup_column_menu(inout self):
+    fn setup_column_menu(mut self):
         """Initialize column context menu."""
         _ = self.column_menu.add_item("Sort Ascending", 1, "sort-ascending")
         _ = self.column_menu.add_item("Sort Descending", 2, "sort-descending")
@@ -185,13 +235,13 @@ struct ColumnHeaderInt(BaseWidgetInt):
         _ = self.column_menu.add_item("Show All Columns", 5, "show-all")
         _ = self.column_menu.add_item("Column Settings...", 6, "settings")
     
-    fn handle_menu_selection(inout self, menu_id: Int32):
+    fn handle_menu_selection(mut self, menu_id: Int32):
         """Handle column menu selection."""
         if self.menu_column < 0 or self.menu_column >= len(self.columns):
             return
         
-        let column = self.columns[self.menu_column]
-        
+        var column = self.columns[self.menu_column].copy()
+
         if menu_id == 1:  # Sort Ascending
             self.set_column_sort(column.id, SORT_ASCENDING)
         elif menu_id == 2:  # Sort Descending
@@ -205,15 +255,15 @@ struct ColumnHeaderInt(BaseWidgetInt):
             for i in range(len(self.columns)):
                 self.columns[i].visible = True
     
-    fn handle_mouse_event(inout self, event: MouseEventInt) -> Bool:
+    fn handle_mouse_event(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse events."""
         if not self.visible or not self.enabled:
             return False
         
-        let point = PointInt(event.x, event.y)
+        var point = PointInt(event.x, event.y)
         
         # Handle column menu
-        if self.column_menu.is_open:
+        if self.column_menu.is_visible:
             if self.column_menu.handle_mouse_event(event):
                 return True
         
@@ -221,7 +271,7 @@ struct ColumnHeaderInt(BaseWidgetInt):
             return False
         
         # Check for resize handle
-        let resize_col = self.hit_test_resize_handle(event.x, event.y)
+        var resize_col = self.hit_test_resize_handle(event.x, event.y)
         
         if event.pressed:
             if resize_col >= 0:
@@ -234,14 +284,14 @@ struct ColumnHeaderInt(BaseWidgetInt):
                 # Check which column was clicked
                 for i in range(len(self.columns)):
                     if self.columns[i].visible:
-                        let col_rect = self.get_column_rect(i)
+                        var col_rect = self.get_column_rect(i)
                         if col_rect.contains(point):
                             self.pressed_column = i
                             
                             # Right-click shows menu
                             if event.button == MOUSE_BUTTON_RIGHT:
                                 self.menu_column = i
-                                self.column_menu.show(event.x, event.y, True)
+                                self.column_menu.show_at(event.x, event.y)
                                 return True
                             
                             return True
@@ -253,10 +303,10 @@ struct ColumnHeaderInt(BaseWidgetInt):
                 return True
             elif self.pressed_column >= 0:
                 # Check if still over same column (click completed)
-                let col_rect = self.get_column_rect(self.pressed_column)
+                var col_rect = self.get_column_rect(self.pressed_column)
                 if col_rect.contains(point) and self.columns[self.pressed_column].sortable:
                     # Toggle sort order
-                    let column = self.columns[self.pressed_column]
+                    var column = self.columns[self.pressed_column].copy()
                     var new_sort = SORT_ASCENDING
                     if column.sort_order == SORT_ASCENDING:
                         new_sort = SORT_DESCENDING
@@ -271,8 +321,8 @@ struct ColumnHeaderInt(BaseWidgetInt):
         # Handle dragging
         if self.resize_column >= 0:
             # Resize column
-            let delta = event.x - self.resize_start_x
-            let new_width = self.resize_start_width + delta
+            var delta = event.x - self.resize_start_x
+            var new_width = self.resize_start_width + delta
             self.columns[self.resize_column].width = max(self.columns[self.resize_column].min_width,
                                                         min(new_width, self.columns[self.resize_column].max_width))
             return True
@@ -281,7 +331,7 @@ struct ColumnHeaderInt(BaseWidgetInt):
         self.hover_column = -1
         for i in range(len(self.columns)):
             if self.columns[i].visible:
-                let col_rect = self.get_column_rect(i)
+                var col_rect = self.get_column_rect(i)
                 if col_rect.contains(point):
                     self.hover_column = i
                     break
@@ -293,7 +343,11 @@ struct ColumnHeaderInt(BaseWidgetInt):
         if self.hit_test_resize_handle(x, y) >= 0:
             return 1  # Resize cursor
         return 0  # Default cursor
-    
+
+    fn handle_key_event(mut self, event: KeyEventInt) -> Bool:
+        """Handle key events (not typically used)."""
+        return False
+
     fn render(self, ctx: RenderingContextInt):
         """Render column headers."""
         if not self.visible:
@@ -317,13 +371,13 @@ struct ColumnHeaderInt(BaseWidgetInt):
                          self.bounds.x + self.bounds.width, self.bounds.y + self.bounds.height - 1, 1)
         
         # Render column menu if open
-        if self.column_menu.is_open:
-            self.column_menu.render(ctx)
+        if self.column_menu.is_visible:
+            self.column_menu.draw(ctx)
     
     fn render_column(self, ctx: RenderingContextInt, index: Int32):
         """Render individual column header."""
-        let column = self.columns[index]
-        let rect = self.get_column_rect(index)
+        var column = self.columns[index].copy()
+        var rect = self.get_column_rect(index)
         
         # Column background
         if index == self.pressed_column:
@@ -340,7 +394,7 @@ struct ColumnHeaderInt(BaseWidgetInt):
                          self.text_color.b, self.text_color.a)
         
         var text_x = rect.x + self.padding
-        let text_y = rect.y + (rect.height - self.font_size) // 2
+        var text_y = rect.y + (rect.height - self.font_size) // 2
         var max_text_width = rect.width - self.padding * 2
         
         # Account for sort indicator
@@ -349,21 +403,21 @@ struct ColumnHeaderInt(BaseWidgetInt):
         
         # Truncate text if needed
         var display_text = column.title
-        let char_width = self.font_size * 6 // 10
+        var char_width = self.font_size * 6 // 10
         if len(display_text) * char_width > max_text_width:
             # Simple truncation
-            while len(display_text) > 0 and 
-                  len(display_text) * char_width > max_text_width - 20:
-                display_text = display_text[:-1]
+            while (len(display_text) > 0 and
+                  len(display_text) * char_width > max_text_width - 20):
+                display_text = String(display_text[:len(display_text) - 1])
             if len(display_text) < len(column.title):
                 display_text += "..."
         
         # Apply alignment
         if column.alignment == ALIGN_CENTER:
-            let text_width = len(display_text) * char_width
+            var text_width = len(display_text) * char_width
             text_x = rect.x + (rect.width - text_width) // 2
         elif column.alignment == ALIGN_RIGHT:
-            let text_width = len(display_text) * char_width
+            var text_width = len(display_text) * char_width
             text_x = rect.x + rect.width - text_width - self.padding
             if column.sort_order != SORT_NONE:
                 text_x -= self.sort_indicator_size + 4
@@ -375,8 +429,8 @@ struct ColumnHeaderInt(BaseWidgetInt):
             _ = ctx.set_color(self.sort_indicator_color.r, self.sort_indicator_color.g,
                              self.sort_indicator_color.b, self.sort_indicator_color.a)
             
-            let arrow_x = rect.x + rect.width - self.padding - self.sort_indicator_size // 2
-            let arrow_y = rect.y + rect.height // 2
+            var arrow_x = rect.x + rect.width - self.padding - self.sort_indicator_size // 2
+            var arrow_y = rect.y + rect.height // 2
             
             if column.sort_order == SORT_ASCENDING:
                 # Up arrow
@@ -394,9 +448,10 @@ struct ColumnHeaderInt(BaseWidgetInt):
             _ = ctx.draw_line(rect.x + rect.width - 1, rect.y + 4,
                              rect.x + rect.width - 1, rect.y + rect.height - 4, 1)
     
-    fn update(inout self):
+    fn update(mut self):
         """Update column header state."""
-        self.column_menu.update()
+        # ContextMenuInt has no per-frame update; nothing to do.
+        pass
     
     fn get_total_width(self) -> Int32:
         """Get total width of all visible columns."""
@@ -434,5 +489,5 @@ fn create_table_columns() -> ColumnHeaderInt:
     # Set alignments
     header.columns[1].alignment = ALIGN_RIGHT  # Size
     header.columns[3].alignment = ALIGN_CENTER  # Date
-    
-    return header
+
+    return header^

@@ -7,33 +7,46 @@ Professional numeric input with up/down buttons, constraints, and precision cont
 from sys.ffi import DLHandle, DLSymbol
 from memory import alloc, UnsafePointer
 from builtin.type_aliases import MutExternalOrigin
-from ..widget_int import BaseWidgetInt
 
 # SpinBox types
-alias SPINBOX_INTEGER: Int32 = 0
-alias SPINBOX_FLOAT: Int32 = 1
+comptime SPINBOX_INTEGER: Int32 = 0
+comptime SPINBOX_FLOAT: Int32 = 1
 
 # Events
-alias EVENT_SPINBOX_VALUE_CHANGED: Int32 = 1001
+comptime EVENT_SPINBOX_VALUE_CHANGED: Int32 = 1001
 
-struct SpinBoxInt(BaseWidgetInt):
+struct SpinBoxInt(Copyable, Movable):
     """
     Professional SpinBox widget with up/down buttons for numeric input
     Supports both integer and floating-point values with precision control
     """
+    var x: Int32
+    var y: Int32
+    var width: Int32
+    var height: Int32
+    var visible: Bool
+    var enabled: Bool
+    var focused: Bool
     var spinbox_type: Int32
     var value: Int32           # Value * 1000 for float precision
-    var min_value: Int32       # Min * 1000 for float precision  
+    var min_value: Int32       # Min * 1000 for float precision
     var max_value: Int32       # Max * 1000 for float precision
     var step: Int32            # Step * 1000 for float precision
     var precision: Int32       # Decimal places for float display
     var button_width: Int32
     var editing: Bool
     var cursor_pos: Int32
-    
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32, height: Int32, 
+
+    fn __init__(out self, x: Int32, y: Int32, width: Int32, height: Int32,
                spinbox_type: Int32 = SPINBOX_INTEGER):
         """Initialize SpinBox with position, size and type"""
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.visible = True
+        self.enabled = True
+        self.focused = False
         self.spinbox_type = spinbox_type
         self.value = 0
         self.min_value = -2147483000  # Large negative for range
@@ -43,21 +56,29 @@ struct SpinBoxInt(BaseWidgetInt):
         self.button_width = 20
         self.editing = False
         self.cursor_pos = 0
-        super().__init__(x, y, width, height, "spinbox")
 
-    fn set_value(inout self, value: Int32):
+    fn is_point_inside(self, px: Int32, py: Int32) -> Bool:
+        """Check if a point is inside the widget bounds."""
+        return (px >= self.x and px <= self.x + self.width and
+                py >= self.y and py <= self.y + self.height)
+
+    fn trigger_event(self, event_type: Int32, event_data: Int32):
+        """Placeholder event dispatch (no-op without an event manager)."""
+        pass
+
+    fn set_value(mut self, value: Int32):
         """Set spinbox value (for integers) or value*1000 (for floats)"""
         var clamped_value = value
         if clamped_value < self.min_value:
             clamped_value = self.min_value
         if clamped_value > self.max_value:
             clamped_value = self.max_value
-            
+
         # Round to step
         if self.step > 0:
             var steps = clamped_value // self.step
             clamped_value = steps * self.step
-            
+
         self.value = clamped_value
         self.trigger_event(EVENT_SPINBOX_VALUE_CHANGED, clamped_value)
 
@@ -65,34 +86,34 @@ struct SpinBoxInt(BaseWidgetInt):
         """Get current spinbox value"""
         return self.value
 
-    fn set_range(inout self, min_val: Int32, max_val: Int32):
+    fn set_range(mut self, min_val: Int32, max_val: Int32):
         """Set min/max range for the spinbox"""
         self.min_value = min_val
         self.max_value = max_val
         # Re-clamp current value
         self.set_value(self.value)
 
-    fn set_step(inout self, step: Int32):
+    fn set_step(mut self, step: Int32):
         """Set increment/decrement step"""
         self.step = step
 
-    fn set_precision(inout self, precision: Int32):
+    fn set_precision(mut self, precision: Int32):
         """Set decimal precision for float type"""
         self.precision = precision
 
-    fn increment(inout self):
+    fn increment(mut self):
         """Increment value by step"""
         self.set_value(self.value + self.step)
 
-    fn decrement(inout self):
+    fn decrement(mut self):
         """Decrement value by step"""
         self.set_value(self.value - self.step)
 
-    fn handle_mouse_down(inout self, mouse_x: Int32, mouse_y: Int32) -> Bool:
+    fn handle_mouse_down(mut self, mouse_x: Int32, mouse_y: Int32) -> Bool:
         """Handle mouse down events"""
         if not self.is_point_inside(mouse_x, mouse_y):
             return False
-            
+
         if not self.enabled:
             return False
 
@@ -104,7 +125,7 @@ struct SpinBoxInt(BaseWidgetInt):
             self.trigger_event(1002, 1)  # Up button pressed
             return True
 
-        # Check down button (right side, bottom half)  
+        # Check down button (right side, bottom half)
         if (mouse_x >= button_x and mouse_x <= self.x + self.width and
             mouse_y >= self.y + self.height // 2 and mouse_y <= self.y + self.height):
             self.decrement()
@@ -121,7 +142,7 @@ struct SpinBoxInt(BaseWidgetInt):
 
         return False
 
-    fn handle_key_input(inout self, key_code: Int32) -> Bool:
+    fn handle_key_input(mut self, key_code: Int32) -> Bool:
         """Handle keyboard input when editing"""
         if not self.editing or not self.focused:
             return False
@@ -173,23 +194,23 @@ struct SpinBoxInt(BaseWidgetInt):
         # Draw value text
         _ = set_color(0, 0, 0, 255)  # Black text
         var value_str: String
-        
+
         if self.spinbox_type == SPINBOX_FLOAT:
             # Convert back from internal representation (value/1000)
             var float_val = self.value
             var integer_part = float_val // 1000
             var decimal_part = abs(float_val % 1000)
-            
+
             if self.precision == 0:
-                value_str = str(integer_part)
+                value_str = String(integer_part)
             elif self.precision == 1:
-                value_str = str(integer_part) + "." + str(decimal_part // 100)
+                value_str = String(integer_part) + "." + String(decimal_part // 100)
             elif self.precision == 2:
-                value_str = str(integer_part) + "." + str(decimal_part // 10).zfill(2)
+                value_str = String(integer_part) + "." + String(decimal_part // 10).zfill(2)
             else:
-                value_str = str(integer_part) + "." + str(decimal_part).zfill(3)
+                value_str = String(integer_part) + "." + String(decimal_part).zfill(3)
         else:
-            value_str = str(self.value)
+            value_str = String(self.value)
 
         var value_bytes = value_str.as_bytes()
         var value_ptr = value_bytes.unsafe_ptr().bitcast[Int8]()
@@ -198,7 +219,7 @@ struct SpinBoxInt(BaseWidgetInt):
         # Draw cursor if editing
         if self.editing and self.focused:
             _ = set_color(0, 0, 0, 255)
-            var cursor_x = self.x + 5 + len(value_str) * 6  # Approximate text width
+            var cursor_x = self.x + 5 + Int32(len(value_str)) * 6  # Approximate text width
             _ = draw_filled_rectangle(cursor_x, self.y + 3, 1, self.height - 6)
 
         # Button area (right side)
@@ -242,18 +263,18 @@ struct SpinBoxInt(BaseWidgetInt):
             _ = draw_filled_rectangle(self.x, self.y, self.width, self.height)
 
 # Convenience functions for creating SpinBox widgets
-fn create_integer_spinbox(x: Int32, y: Int32, width: Int32, height: Int32, 
-                         initial_value: Int32 = 0, min_val: Int32 = -1000000, 
+fn create_integer_spinbox(x: Int32, y: Int32, width: Int32, height: Int32,
+                         initial_value: Int32 = 0, min_val: Int32 = -1000000,
                          max_val: Int32 = 1000000, step: Int32 = 1) -> SpinBoxInt:
     """Create an integer spinbox with range and step"""
     var spinbox = SpinBoxInt(x, y, width, height, SPINBOX_INTEGER)
     spinbox.set_range(min_val, max_val)
     spinbox.set_step(step)
     spinbox.set_value(initial_value)
-    return spinbox
+    return spinbox^
 
 fn create_float_spinbox(x: Int32, y: Int32, width: Int32, height: Int32,
-                       initial_value_x1000: Int32 = 0, min_val_x1000: Int32 = -1000000, 
+                       initial_value_x1000: Int32 = 0, min_val_x1000: Int32 = -1000000,
                        max_val_x1000: Int32 = 1000000, step_x1000: Int32 = 100,
                        precision: Int32 = 2) -> SpinBoxInt:
     """Create a float spinbox (values multiplied by 1000 for precision)"""
@@ -262,7 +283,7 @@ fn create_float_spinbox(x: Int32, y: Int32, width: Int32, height: Int32,
     spinbox.set_step(step_x1000)
     spinbox.set_precision(precision)
     spinbox.set_value(initial_value_x1000)
-    return spinbox
+    return spinbox^
 
 fn create_coordinate_spinbox(x: Int32, y: Int32, width: Int32, height: Int32) -> SpinBoxInt:
     """Create a spinbox optimized for coordinate input (0-10000 range)"""
@@ -270,7 +291,7 @@ fn create_coordinate_spinbox(x: Int32, y: Int32, width: Int32, height: Int32) ->
     spinbox.set_range(0, 10000)
     spinbox.set_step(1)
     spinbox.set_value(0)
-    return spinbox
+    return spinbox^
 
 fn create_percentage_spinbox(x: Int32, y: Int32, width: Int32, height: Int32) -> SpinBoxInt:
     """Create a spinbox for percentage values (0.0-100.0%)"""
@@ -279,4 +300,4 @@ fn create_percentage_spinbox(x: Int32, y: Int32, width: Int32, height: Int32) ->
     spinbox.set_step(1000)        # 1.000 step
     spinbox.set_precision(3)
     spinbox.set_value(0)
-    return spinbox
+    return spinbox^

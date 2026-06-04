@@ -8,20 +8,20 @@ from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
 from .button_int import ButtonInt
 
 # Dock positions
-alias DOCK_LEFT: Int32 = 0
-alias DOCK_RIGHT: Int32 = 1
-alias DOCK_TOP: Int32 = 2
-alias DOCK_BOTTOM: Int32 = 3
-alias DOCK_CENTER: Int32 = 4
-alias DOCK_FLOAT: Int32 = 5
+comptime DOCK_LEFT: Int32 = 0
+comptime DOCK_RIGHT: Int32 = 1
+comptime DOCK_TOP: Int32 = 2
+comptime DOCK_BOTTOM: Int32 = 3
+comptime DOCK_CENTER: Int32 = 4
+comptime DOCK_FLOAT: Int32 = 5
 
 # Auto-hide states
-alias AUTOHIDE_NONE: Int32 = 0
-alias AUTOHIDE_PINNED: Int32 = 1
-alias AUTOHIDE_HIDDEN: Int32 = 2
-alias AUTOHIDE_SHOWING: Int32 = 3
+comptime AUTOHIDE_NONE: Int32 = 0
+comptime AUTOHIDE_PINNED: Int32 = 1
+comptime AUTOHIDE_HIDDEN: Int32 = 2
+comptime AUTOHIDE_SHOWING: Int32 = 3
 
-struct DockablePanel:
+struct DockablePanel(ImplicitlyCopyable, Movable):
     """Individual dockable panel."""
     var title: String
     var dock_position: Int32
@@ -32,7 +32,7 @@ struct DockablePanel:
     var min_size: SizeInt
     var content_widget_id: Int32  # Would reference actual widget in real implementation
     
-    fn __init__(inout self, title: String, dock_position: Int32 = DOCK_LEFT):
+    fn __init__(out self, title: String, dock_position: Int32 = DOCK_LEFT):
         self.title = title
         self.dock_position = dock_position
         self.float_rect = RectInt(100, 100, 300, 200)
@@ -42,9 +42,17 @@ struct DockablePanel:
         self.min_size = SizeInt(150, 100)
         self.content_widget_id = 0
 
-struct DockPanelInt(BaseWidgetInt):
+struct DockPanelInt(WidgetInt, Copyable, Movable):
     """Docking panel system with floating windows and auto-hide."""
-    
+
+    # Inlined BaseWidgetInt fields (struct inheritance is not supported).
+    var bounds: RectInt
+    var visible: Bool
+    var enabled: Bool
+    var background_color: ColorInt
+    var border_color: ColorInt
+    var border_width: Int32
+
     var panels: List[DockablePanel]
     var center_content: RectInt
     var dock_sizes: List[Int32]  # Size of each dock area
@@ -67,8 +75,13 @@ struct DockPanelInt(BaseWidgetInt):
     var title_bar_color: ColorInt
     var auto_hide_tab_color: ColorInt
     
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32, height: Int32):
-        self.super().__init__(x, y, width, height)
+    fn __init__(out self, x: Int32, y: Int32, width: Int32, height: Int32):
+        self.bounds = RectInt(x, y, width, height)
+        self.visible = True
+        self.enabled = True
+        self.background_color = ColorInt(230, 230, 230, 255)
+        self.border_color = ColorInt(128, 128, 128, 255)
+        self.border_width = 1
         self.panels = List[DockablePanel]()
         self.center_content = RectInt(x, y, width, height)
         self.dock_sizes = List[Int32]()
@@ -95,22 +108,60 @@ struct DockPanelInt(BaseWidgetInt):
         self.tab_inactive_color = ColorInt(225, 225, 225, 255)
         self.title_bar_color = ColorInt(70, 130, 180, 255)  # Steel blue
         self.auto_hide_tab_color = ColorInt(200, 200, 200, 255)
-    
-    fn add_panel(inout self, title: String, dock_position: Int32 = DOCK_LEFT) -> Int32:
+
+    # Inlined BaseWidgetInt methods (struct inheritance is not supported).
+    fn get_bounds(self) -> RectInt:
+        return self.bounds
+
+    fn set_bounds(mut self, bounds: RectInt):
+        self.bounds = bounds
+
+    fn is_visible(self) -> Bool:
+        return self.visible
+
+    fn set_visible(mut self, visible: Bool):
+        self.visible = visible
+
+    fn is_enabled(self) -> Bool:
+        return self.enabled
+
+    fn set_enabled(mut self, enabled: Bool):
+        self.enabled = enabled
+
+    fn contains_point(self, point: PointInt) -> Bool:
+        return self.bounds.contains(point)
+
+    fn render_background(self, ctx: RenderingContextInt):
+        if not self.visible:
+            return
+        _ = ctx.set_color(self.background_color.r, self.background_color.g,
+                          self.background_color.b, self.background_color.a)
+        _ = ctx.draw_filled_rectangle(self.bounds.x, self.bounds.y,
+                                      self.bounds.width, self.bounds.height)
+        if self.border_width > 0:
+            _ = ctx.set_color(self.border_color.r, self.border_color.g,
+                              self.border_color.b, self.border_color.a)
+            _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
+                                   self.bounds.width, self.bounds.height)
+
+    fn handle_key_event(mut self, event: KeyEventInt) -> Bool:
+        return False
+
+    fn add_panel(mut self, title: String, dock_position: Int32 = DOCK_LEFT) -> Int32:
         """Add a dockable panel."""
-        let panel = DockablePanel(title, dock_position)
+        var panel = DockablePanel(title, dock_position)
         self.panels.append(panel)
         self.update_layout()
         return len(self.panels) - 1
     
-    fn dock_panel(inout self, panel_index: Int32, dock_position: Int32):
+    fn dock_panel(mut self, panel_index: Int32, dock_position: Int32):
         """Dock a panel to specified position."""
         if panel_index >= 0 and panel_index < len(self.panels):
             self.panels[panel_index].dock_position = dock_position
             self.panels[panel_index].is_floating = (dock_position == DOCK_FLOAT)
             self.update_layout()
     
-    fn float_panel(inout self, panel_index: Int32, x: Int32, y: Int32):
+    fn float_panel(mut self, panel_index: Int32, x: Int32, y: Int32):
         """Float a panel at specified position."""
         if panel_index >= 0 and panel_index < len(self.panels):
             self.panels[panel_index].is_floating = True
@@ -118,7 +169,7 @@ struct DockPanelInt(BaseWidgetInt):
             self.panels[panel_index].float_rect.x = x
             self.panels[panel_index].float_rect.y = y
     
-    fn set_auto_hide(inout self, panel_index: Int32, enabled: Bool):
+    fn set_auto_hide(mut self, panel_index: Int32, enabled: Bool):
         """Enable/disable auto-hide for a panel."""
         if panel_index >= 0 and panel_index < len(self.panels):
             if enabled:
@@ -128,24 +179,24 @@ struct DockPanelInt(BaseWidgetInt):
     
     fn save_layout(self) -> String:
         """Save current layout to string."""
-        var layout = "DOCKLAYOUT:1.0\n"
+        var layout = String("DOCKLAYOUT:1.0\n")
         for i in range(len(self.panels)):
-            let p = self.panels[i]
+            var p = self.panels[i]
             layout += p.title + "|"
-            layout += str(p.dock_position) + "|"
-            layout += str(p.is_floating) + "|"
-            layout += str(p.float_rect.x) + "," + str(p.float_rect.y) + ","
-            layout += str(p.float_rect.width) + "," + str(p.float_rect.height) + "|"
-            layout += str(p.auto_hide_state) + "\n"
+            layout += String(p.dock_position) + "|"
+            layout += String(p.is_floating) + "|"
+            layout += String(p.float_rect.x) + "," + String(p.float_rect.y) + ","
+            layout += String(p.float_rect.width) + "," + String(p.float_rect.height) + "|"
+            layout += String(p.auto_hide_state) + "\n"
         return layout
     
-    fn restore_layout(inout self, layout: String):
+    fn restore_layout(mut self, layout: String):
         """Restore layout from string."""
         # Parse layout string and restore panel positions
         # Simplified for demo
         pass
     
-    fn update_layout(inout self):
+    fn update_layout(mut self):
         """Recalculate panel positions."""
         # Calculate center content area
         var left = self.bounds.x
@@ -155,7 +206,7 @@ struct DockPanelInt(BaseWidgetInt):
         
         # Account for docked panels
         for i in range(len(self.panels)):
-            let panel = self.panels[i]
+            var panel = self.panels[i]
             if not panel.is_floating and panel.is_visible:
                 if panel.dock_position == DOCK_LEFT:
                     left += self.dock_sizes[0] + self.splitter_width
@@ -173,7 +224,7 @@ struct DockPanelInt(BaseWidgetInt):
         if panel_index < 0 or panel_index >= len(self.panels):
             return RectInt(0, 0, 0, 0)
         
-        let panel = self.panels[panel_index]
+        var panel = self.panels[panel_index]
         if panel.is_floating:
             return panel.float_rect
         
@@ -194,14 +245,14 @@ struct DockPanelInt(BaseWidgetInt):
         else:
             return self.center_content
     
-    fn handle_mouse_event(inout self, event: MouseEventInt) -> Bool:
+    fn handle_mouse_event(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse events for docking and dragging."""
-        let point = PointInt(event.x, event.y)
+        var point = PointInt(event.x, event.y)
         
         # Check floating panels first (on top)
         for i in range(len(self.panels) - 1, -1, -1):
             if self.panels[i].is_floating and self.panels[i].is_visible:
-                let rect = self.panels[i].float_rect
+                var rect = self.panels[i].float_rect
                 if rect.contains(point):
                     if event.pressed:
                         # Check if clicking title bar
@@ -224,7 +275,7 @@ struct DockPanelInt(BaseWidgetInt):
         # Check auto-hide tabs
         for i in range(len(self.panels)):
             if self.panels[i].auto_hide_state == AUTOHIDE_HIDDEN:
-                let tab_rect = self.get_auto_hide_tab_rect(i)
+                var tab_rect = self.get_auto_hide_tab_rect(i)
                 if tab_rect.contains(point):
                     self.hover_auto_hide_tab = i
                     if event.pressed:
@@ -236,7 +287,7 @@ struct DockPanelInt(BaseWidgetInt):
     
     fn get_auto_hide_tab_rect(self, panel_index: Int32) -> RectInt:
         """Get auto-hide tab rectangle."""
-        let panel = self.panels[panel_index]
+        var panel = self.panels[panel_index]
         var tab_y = self.bounds.y + panel_index * (self.auto_hide_tab_width + 2)
         
         if panel.dock_position == DOCK_LEFT:
@@ -273,8 +324,8 @@ struct DockPanelInt(BaseWidgetInt):
     
     fn render_docked_panel(self, ctx: RenderingContextInt, panel_index: Int32):
         """Render a docked panel."""
-        let rect = self.get_panel_rect(panel_index)
-        let panel = self.panels[panel_index]
+        var rect = self.get_panel_rect(panel_index)
+        var panel = self.panels[panel_index]
         
         # Panel background
         _ = ctx.set_color(self.dock_bg_color.r, self.dock_bg_color.g,
@@ -297,8 +348,8 @@ struct DockPanelInt(BaseWidgetInt):
     
     fn render_floating_panel(self, ctx: RenderingContextInt, panel_index: Int32):
         """Render a floating panel."""
-        let panel = self.panels[panel_index]
-        let rect = panel.float_rect
+        var panel = self.panels[panel_index]
+        var rect = panel.float_rect
         
         # Shadow
         _ = ctx.set_color(0, 0, 0, 50)
@@ -319,8 +370,8 @@ struct DockPanelInt(BaseWidgetInt):
         _ = ctx.draw_text(panel.title, rect.x + 5, rect.y + 3, 12)
         
         # Close button
-        let close_x = rect.x + rect.width - 20
-        let close_y = rect.y + 5
+        var close_x = rect.x + rect.width - 20
+        var close_y = rect.y + 5
         _ = ctx.draw_line(close_x, close_y, close_x + 10, close_y + 10, 2)
         _ = ctx.draw_line(close_x + 10, close_y, close_x, close_y + 10, 2)
         
@@ -331,11 +382,11 @@ struct DockPanelInt(BaseWidgetInt):
     
     fn render_auto_hide_tab(self, ctx: RenderingContextInt, panel_index: Int32):
         """Render auto-hide tab."""
-        let tab_rect = self.get_auto_hide_tab_rect(panel_index)
-        let is_hover = (panel_index == self.hover_auto_hide_tab)
+        var tab_rect = self.get_auto_hide_tab_rect(panel_index)
+        var is_hover = (panel_index == self.hover_auto_hide_tab)
         
         # Tab background
-        let color = self.tab_active_color if is_hover else self.auto_hide_tab_color
+        var color = self.tab_active_color if is_hover else self.auto_hide_tab_color
         _ = ctx.set_color(color.r, color.g, color.b, color.a)
         _ = ctx.draw_filled_rectangle(tab_rect.x, tab_rect.y, 
                                      tab_rect.width, tab_rect.height)
@@ -346,7 +397,7 @@ struct DockPanelInt(BaseWidgetInt):
         _ = ctx.draw_rectangle(tab_rect.x, tab_rect.y, 
                               tab_rect.width, tab_rect.height)
     
-    fn update(inout self):
+    fn update(mut self):
         """Update auto-hide animations."""
         # Update auto-hide timer
         if self.hover_auto_hide_tab >= 0:
@@ -358,10 +409,10 @@ struct DockPanelInt(BaseWidgetInt):
 
 
 # Accordion expansion modes
-alias ACCORDION_SINGLE: Int32 = 0
-alias ACCORDION_MULTIPLE: Int32 = 1
+comptime ACCORDION_SINGLE: Int32 = 0
+comptime ACCORDION_MULTIPLE: Int32 = 1
 
-struct AccordionSection:
+struct AccordionSection(ImplicitlyCopyable, Movable):
     """Individual accordion section."""
     var title: String
     var content_height: Int32
@@ -370,7 +421,7 @@ struct AccordionSection:
     var enabled: Bool
     var data: Int32
     
-    fn __init__(inout self, title: String, content_height: Int32 = 100):
+    fn __init__(out self, title: String, content_height: Int32 = 100):
         self.title = title
         self.content_height = content_height
         self.is_expanded = False
@@ -378,9 +429,17 @@ struct AccordionSection:
         self.enabled = True
         self.data = 0
 
-struct AccordionInt(BaseWidgetInt):
+struct AccordionInt(WidgetInt, Copyable, Movable):
     """Collapsible accordion widget with smooth animations."""
-    
+
+    # Inlined BaseWidgetInt fields (struct inheritance is not supported).
+    var bounds: RectInt
+    var visible: Bool
+    var enabled: Bool
+    var background_color: ColorInt
+    var border_color: ColorInt
+    var border_width: Int32
+
     var sections: List[AccordionSection]
     var expansion_mode: Int32
     var header_height: Int32
@@ -396,9 +455,14 @@ struct AccordionInt(BaseWidgetInt):
     var text_color: ColorInt
     var icon_color: ColorInt
     
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32, height: Int32,
+    fn __init__(out self, x: Int32, y: Int32, width: Int32, height: Int32,
                 expansion_mode: Int32 = ACCORDION_SINGLE):
-        self.super().__init__(x, y, width, height)
+        self.bounds = RectInt(x, y, width, height)
+        self.visible = True
+        self.enabled = True
+        self.background_color = ColorInt(230, 230, 230, 255)
+        self.border_color = ColorInt(128, 128, 128, 255)
+        self.border_width = 1
         self.sections = List[AccordionSection]()
         self.expansion_mode = expansion_mode
         self.header_height = 30
@@ -413,12 +477,50 @@ struct AccordionInt(BaseWidgetInt):
         self.content_color = ColorInt(255, 255, 255, 255)
         self.text_color = ColorInt(0, 0, 0, 255)
         self.icon_color = ColorInt(100, 100, 100, 255)
-    
-    fn add_section(inout self, title: String, content_height: Int32 = 100):
+
+    # Inlined BaseWidgetInt methods (struct inheritance is not supported).
+    fn get_bounds(self) -> RectInt:
+        return self.bounds
+
+    fn set_bounds(mut self, bounds: RectInt):
+        self.bounds = bounds
+
+    fn is_visible(self) -> Bool:
+        return self.visible
+
+    fn set_visible(mut self, visible: Bool):
+        self.visible = visible
+
+    fn is_enabled(self) -> Bool:
+        return self.enabled
+
+    fn set_enabled(mut self, enabled: Bool):
+        self.enabled = enabled
+
+    fn contains_point(self, point: PointInt) -> Bool:
+        return self.bounds.contains(point)
+
+    fn render_background(self, ctx: RenderingContextInt):
+        if not self.visible:
+            return
+        _ = ctx.set_color(self.background_color.r, self.background_color.g,
+                          self.background_color.b, self.background_color.a)
+        _ = ctx.draw_filled_rectangle(self.bounds.x, self.bounds.y,
+                                      self.bounds.width, self.bounds.height)
+        if self.border_width > 0:
+            _ = ctx.set_color(self.border_color.r, self.border_color.g,
+                              self.border_color.b, self.border_color.a)
+            _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
+                                   self.bounds.width, self.bounds.height)
+
+    fn handle_key_event(mut self, event: KeyEventInt) -> Bool:
+        return False
+
+    fn add_section(mut self, title: String, content_height: Int32 = 100):
         """Add a new accordion section."""
         self.sections.append(AccordionSection(title, content_height))
     
-    fn expand_section(inout self, index: Int32):
+    fn expand_section(mut self, index: Int32):
         """Expand a section."""
         if index < 0 or index >= len(self.sections):
             return
@@ -431,12 +533,12 @@ struct AccordionInt(BaseWidgetInt):
         
         self.sections[index].is_expanded = True
     
-    fn collapse_section(inout self, index: Int32):
+    fn collapse_section(mut self, index: Int32):
         """Collapse a section."""
         if index >= 0 and index < len(self.sections):
             self.sections[index].is_expanded = False
     
-    fn toggle_section(inout self, index: Int32):
+    fn toggle_section(mut self, index: Int32):
         """Toggle section expansion."""
         if index >= 0 and index < len(self.sections):
             if self.sections[index].is_expanded:
@@ -444,36 +546,37 @@ struct AccordionInt(BaseWidgetInt):
             else:
                 self.expand_section(index)
     
-    fn get_section_rect(self, index: Int32) -> (RectInt, RectInt):
+    fn get_section_rect(self, index: Int32) -> Tuple[RectInt, RectInt]:
         """Get header and content rectangles for a section."""
         var y = self.bounds.y
-        
+
         for i in range(index + 1):
             if i == index:
-                let header = RectInt(self.bounds.x, y, self.bounds.width, self.header_height)
-                let content_h = Int32(self.sections[i].content_height * 
+                var header = RectInt(self.bounds.x, y, self.bounds.width, self.header_height)
+                var content_h = Int32(Float32(self.sections[i].content_height) *
                                      self.sections[i].animation_progress)
-                let content = RectInt(self.bounds.x, y + self.header_height,
+                var content = RectInt(self.bounds.x, y + self.header_height,
                                      self.bounds.width, content_h)
-                return (header, content)
-            
+                return Tuple[RectInt, RectInt](header, content)
+
             y += self.header_height + self.spacing
             if self.sections[i].is_expanded:
-                y += Int32(self.sections[i].content_height * 
+                y += Int32(Float32(self.sections[i].content_height) *
                           self.sections[i].animation_progress)
-        
-        return (RectInt(0, 0, 0, 0), RectInt(0, 0, 0, 0))
+
+        return Tuple[RectInt, RectInt](RectInt(0, 0, 0, 0), RectInt(0, 0, 0, 0))
     
-    fn handle_mouse_event(inout self, event: MouseEventInt) -> Bool:
+    fn handle_mouse_event(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse events."""
         if not self.visible or not self.enabled:
             return False
-        
-        let point = PointInt(event.x, event.y)
-        
+
+        var point = PointInt(event.x, event.y)
+
         # Check which section header was clicked
         for i in range(len(self.sections)):
-            let (header_rect, _) = self.get_section_rect(i)
+            var rects = self.get_section_rect(i)
+            var header_rect = rects[0]
             if header_rect.contains(point):
                 self.hover_section = i
                 if event.pressed and self.sections[i].enabled:
@@ -494,8 +597,10 @@ struct AccordionInt(BaseWidgetInt):
     
     fn render_section(self, ctx: RenderingContextInt, index: Int32):
         """Render individual section."""
-        let section = self.sections[index]
-        let (header_rect, content_rect) = self.get_section_rect(index)
+        var section = self.sections[index]
+        var rects = self.get_section_rect(index)
+        var header_rect = rects[0]
+        var content_rect = rects[1]
         
         # Render header
         var header_color = self.header_color
@@ -510,8 +615,8 @@ struct AccordionInt(BaseWidgetInt):
                                      header_rect.width, header_rect.height)
         
         # Draw expand/collapse icon
-        let icon_x = header_rect.x + 10
-        let icon_y = header_rect.y + self.header_height // 2
+        var icon_x = header_rect.x + 10
+        var icon_y = header_rect.y + self.header_height // 2
         _ = ctx.set_color(self.icon_color.r, self.icon_color.g,
                          self.icon_color.b, self.icon_color.a)
         
@@ -555,7 +660,7 @@ struct AccordionInt(BaseWidgetInt):
             _ = ctx.draw_text("Content for " + section.title,
                              content_rect.x + 10, content_rect.y + 10, 11)
     
-    fn update(inout self):
+    fn update(mut self):
         """Update animations."""
         for i in range(len(self.sections)):
             if self.sections[i].is_expanded:
@@ -571,12 +676,12 @@ struct AccordionInt(BaseWidgetInt):
 
 
 # Toolbar button types
-alias TOOLBAR_BUTTON: Int32 = 0
-alias TOOLBAR_TOGGLE: Int32 = 1
-alias TOOLBAR_DROPDOWN: Int32 = 2
-alias TOOLBAR_SEPARATOR: Int32 = 3
+comptime TOOLBAR_BUTTON: Int32 = 0
+comptime TOOLBAR_TOGGLE: Int32 = 1
+comptime TOOLBAR_DROPDOWN: Int32 = 2
+comptime TOOLBAR_SEPARATOR: Int32 = 3
 
-struct ToolbarItem:
+struct ToolbarItem(ImplicitlyCopyable, Movable):
     """Individual toolbar item."""
     var item_type: Int32
     var text: String
@@ -588,7 +693,7 @@ struct ToolbarItem:
     var dropdown_items: List[String]
     var data: Int32
     
-    fn __init__(inout self, item_type: Int32, text: String, tooltip: String = ""):
+    fn __init__(out self, item_type: Int32, text: String, tooltip: String = ""):
         self.item_type = item_type
         self.text = text
         self.icon = ""
@@ -599,9 +704,17 @@ struct ToolbarItem:
         self.dropdown_items = List[String]()
         self.data = 0
 
-struct ToolBarInt(BaseWidgetInt):
+struct ToolBarInt(WidgetInt, Copyable, Movable):
     """Toolbar with button groups, separators, and overflow handling."""
-    
+
+    # Inlined BaseWidgetInt fields (struct inheritance is not supported).
+    var bounds: RectInt
+    var visible: Bool
+    var enabled: Bool
+    var background_color: ColorInt
+    var border_color: ColorInt
+    var border_width: Int32
+
     var items: List[ToolbarItem]
     var button_height: Int32
     var button_padding: Int32
@@ -623,8 +736,13 @@ struct ToolBarInt(BaseWidgetInt):
     var text_color: ColorInt
     var disabled_color: ColorInt
     
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32, height: Int32):
-        self.super().__init__(x, y, width, height)
+    fn __init__(out self, x: Int32, y: Int32, width: Int32, height: Int32):
+        self.bounds = RectInt(x, y, width, height)
+        self.visible = True
+        self.enabled = True
+        self.background_color = ColorInt(230, 230, 230, 255)
+        self.border_color = ColorInt(128, 128, 128, 255)
+        self.border_width = 1
         self.items = List[ToolbarItem]()
         self.button_height = height - 4
         self.button_padding = 8
@@ -647,34 +765,72 @@ struct ToolBarInt(BaseWidgetInt):
         self.disabled_color = ColorInt(150, 150, 150, 255)
         
         self.background_color = ColorInt(245, 245, 245, 255)
-    
-    fn add_button(inout self, text: String, tooltip: String = ""):
+
+    # Inlined BaseWidgetInt methods (struct inheritance is not supported).
+    fn get_bounds(self) -> RectInt:
+        return self.bounds
+
+    fn set_bounds(mut self, bounds: RectInt):
+        self.bounds = bounds
+
+    fn is_visible(self) -> Bool:
+        return self.visible
+
+    fn set_visible(mut self, visible: Bool):
+        self.visible = visible
+
+    fn is_enabled(self) -> Bool:
+        return self.enabled
+
+    fn set_enabled(mut self, enabled: Bool):
+        self.enabled = enabled
+
+    fn contains_point(self, point: PointInt) -> Bool:
+        return self.bounds.contains(point)
+
+    fn render_background(self, ctx: RenderingContextInt):
+        if not self.visible:
+            return
+        _ = ctx.set_color(self.background_color.r, self.background_color.g,
+                          self.background_color.b, self.background_color.a)
+        _ = ctx.draw_filled_rectangle(self.bounds.x, self.bounds.y,
+                                      self.bounds.width, self.bounds.height)
+        if self.border_width > 0:
+            _ = ctx.set_color(self.border_color.r, self.border_color.g,
+                              self.border_color.b, self.border_color.a)
+            _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
+                                   self.bounds.width, self.bounds.height)
+
+    fn handle_key_event(mut self, event: KeyEventInt) -> Bool:
+        return False
+
+    fn add_button(mut self, text: String, tooltip: String = ""):
         """Add a regular button."""
         var item = ToolbarItem(TOOLBAR_BUTTON, text, tooltip)
         self.calculate_item_width(item)
         self.items.append(item)
     
-    fn add_toggle(inout self, text: String, tooltip: String = "", toggled: Bool = False):
+    fn add_toggle(mut self, text: String, tooltip: String = "", toggled: Bool = False):
         """Add a toggle button."""
         var item = ToolbarItem(TOOLBAR_TOGGLE, text, tooltip)
         item.toggled = toggled
         self.calculate_item_width(item)
         self.items.append(item)
     
-    fn add_dropdown(inout self, text: String, items: List[String], tooltip: String = ""):
+    fn add_dropdown(mut self, text: String, items: List[String], tooltip: String = ""):
         """Add a dropdown button."""
         var item = ToolbarItem(TOOLBAR_DROPDOWN, text, tooltip)
         item.dropdown_items = items
         self.calculate_item_width(item)
         self.items.append(item)
     
-    fn add_separator(inout self):
+    fn add_separator(mut self):
         """Add a separator."""
         var item = ToolbarItem(TOOLBAR_SEPARATOR, "", "")
         item.width = self.separator_width
         self.items.append(item)
     
-    fn calculate_item_width(inout self, item: ToolbarItem):
+    fn calculate_item_width(mut self, item: ToolbarItem):
         """Calculate width for a toolbar item."""
         if item.item_type == TOOLBAR_SEPARATOR:
             item.width = self.separator_width
@@ -688,7 +844,7 @@ struct ToolBarInt(BaseWidgetInt):
                 width += self.button_padding
         
         if self.show_text:
-            let text_width = len(item.text) * 7  # Approximate
+            var text_width = len(item.text) * 7  # Approximate
             width += text_width
         
         if item.item_type == TOOLBAR_DROPDOWN:
@@ -696,10 +852,10 @@ struct ToolBarInt(BaseWidgetInt):
         
         item.width = width
     
-    fn calculate_overflow(inout self):
+    fn calculate_overflow(mut self):
         """Calculate which items go into overflow menu."""
         var x = self.bounds.x + 2
-        let max_x = self.bounds.x + self.bounds.width - 30  # Space for overflow button
+        var max_x = self.bounds.x + self.bounds.width - 30  # Space for overflow button
         
         self.overflow_start = -1
         
@@ -723,12 +879,12 @@ struct ToolBarInt(BaseWidgetInt):
         
         return RectInt(x, self.bounds.y + 2, self.items[index].width, self.button_height)
     
-    fn handle_mouse_event(inout self, event: MouseEventInt) -> Bool:
+    fn handle_mouse_event(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse events."""
         if not self.visible or not self.enabled:
             return False
-        
-        let point = PointInt(event.x, event.y)
+
+        var point = PointInt(event.x, event.y)
         if not self.contains_point(point):
             self.hover_item = -1
             return False
@@ -738,7 +894,7 @@ struct ToolBarInt(BaseWidgetInt):
             if self.overflow_start >= 0 and i >= self.overflow_start:
                 break
             
-            let rect = self.get_item_rect(i)
+            var rect = self.get_item_rect(i)
             if rect.contains(point):
                 self.hover_item = i
                 
@@ -792,12 +948,12 @@ struct ToolBarInt(BaseWidgetInt):
     
     fn render_item(self, ctx: RenderingContextInt, index: Int32):
         """Render individual toolbar item."""
-        let item = self.items[index]
-        let rect = self.get_item_rect(index)
+        var item = self.items[index]
+        var rect = self.get_item_rect(index)
         
         if item.item_type == TOOLBAR_SEPARATOR:
             # Draw separator line
-            let x = rect.x + rect.width // 2
+            var x = rect.x + rect.width // 2
             _ = ctx.set_color(self.separator_color.r, self.separator_color.g,
                              self.separator_color.b, self.separator_color.a)
             _ = ctx.draw_line(x, rect.y, x, rect.y + rect.height, 1)
@@ -820,11 +976,11 @@ struct ToolBarInt(BaseWidgetInt):
         
         # Content position
         var content_x = rect.x + self.button_padding
-        let content_y = rect.y + (rect.height - self.icon_size) // 2
+        var content_y = rect.y + (rect.height - self.icon_size) // 2
         
         # Icon (placeholder - draw small square)
         if self.show_icons:
-            let icon_color = self.text_color if item.enabled else self.disabled_color
+            var icon_color = self.text_color if item.enabled else self.disabled_color
             _ = ctx.set_color(icon_color.r, icon_color.g, 
                              icon_color.b, icon_color.a)
             _ = ctx.draw_filled_rectangle(content_x, content_y, 
@@ -833,15 +989,15 @@ struct ToolBarInt(BaseWidgetInt):
         
         # Text
         if self.show_text and len(item.text) > 0:
-            let text_color = self.text_color if item.enabled else self.disabled_color
+            var text_color = self.text_color if item.enabled else self.disabled_color
             _ = ctx.set_color(text_color.r, text_color.g, 
                              text_color.b, text_color.a)
             _ = ctx.draw_text(item.text, content_x, rect.y + 8, 11)
         
         # Dropdown arrow
         if item.item_type == TOOLBAR_DROPDOWN:
-            let arrow_x = rect.x + rect.width - 10
-            let arrow_y = rect.y + rect.height // 2
+            var arrow_x = rect.x + rect.width - 10
+            var arrow_y = rect.y + rect.height // 2
             _ = ctx.draw_line(arrow_x - 3, arrow_y - 2, arrow_x, arrow_y + 1, 1)
             _ = ctx.draw_line(arrow_x, arrow_y + 1, arrow_x + 3, arrow_y - 2, 1)
         
@@ -853,66 +1009,66 @@ struct ToolBarInt(BaseWidgetInt):
     
     fn render_overflow_button(self, ctx: RenderingContextInt):
         """Render overflow menu button."""
-        let x = self.bounds.x + self.bounds.width - 25
-        let y = self.bounds.y + 2
-        let w = 20
-        let h = self.button_height
+        var x = self.bounds.x + self.bounds.width - 25
+        var y = self.bounds.y + 2
+        var w = 20
+        var h = self.button_height
         
         # Button background
         _ = ctx.set_color(self.button_hover_color.r, self.button_hover_color.g,
                          self.button_hover_color.b, self.button_hover_color.a)
         _ = ctx.draw_filled_rectangle(x, y, w, h)
         
-        // Draw >> symbol
+        # Draw >> symbol
         _ = ctx.set_color(self.text_color.r, self.text_color.g,
                          self.text_color.b, self.text_color.a)
         _ = ctx.draw_text("»", x + 5, y + 8, 12)
-        
-        // Border
+
+        # Border
         _ = ctx.set_color(self.border_color.r, self.border_color.g,
                          self.border_color.b, self.border_color.a)
         _ = ctx.draw_rectangle(x, y, w, h)
     
     fn render_dropdown(self, ctx: RenderingContextInt, index: Int32):
         """Render dropdown menu."""
-        let item = self.items[index]
-        let button_rect = self.get_item_rect(index)
+        var item = self.items[index]
+        var button_rect = self.get_item_rect(index)
         
-        let menu_x = button_rect.x
-        let menu_y = button_rect.y + button_rect.height + 2
-        let menu_width = 150
-        let item_height = 20
-        let menu_height = len(item.dropdown_items) * item_height + 4
-        
-        // Shadow
+        var menu_x = button_rect.x
+        var menu_y = button_rect.y + button_rect.height + 2
+        var menu_width = 150
+        var item_height = 20
+        var menu_height = len(item.dropdown_items) * item_height + 4
+
+        # Shadow
         _ = ctx.set_color(0, 0, 0, 30)
         _ = ctx.draw_filled_rectangle(menu_x + 2, menu_y + 2, menu_width, menu_height)
-        
-        // Background
+
+        # Background
         _ = ctx.set_color(255, 255, 255, 255)
         _ = ctx.draw_filled_rectangle(menu_x, menu_y, menu_width, menu_height)
-        
-        // Items
+
+        # Items
         for i in range(len(item.dropdown_items)):
-            let item_y = menu_y + 2 + i * item_height
-            
-            // Hover effect (simplified)
-            if i == 0:  // Demo hover on first item
+            var item_y = menu_y + 2 + i * item_height
+
+            # Hover effect (simplified)
+            if i == 0:  # Demo hover on first item
                 _ = ctx.set_color(self.button_hover_color.r, self.button_hover_color.g,
                                  self.button_hover_color.b, self.button_hover_color.a)
-                _ = ctx.draw_filled_rectangle(menu_x + 2, item_y, 
+                _ = ctx.draw_filled_rectangle(menu_x + 2, item_y,
                                              menu_width - 4, item_height)
-            
+
             _ = ctx.set_color(self.text_color.r, self.text_color.g,
                              self.text_color.b, self.text_color.a)
             _ = ctx.draw_text(item.dropdown_items[i], menu_x + 8, item_y + 4, 11)
-        
-        // Border
+
+        # Border
         _ = ctx.set_color(self.border_color.r, self.border_color.g,
                          self.border_color.b, self.border_color.a)
         _ = ctx.draw_rectangle(menu_x, menu_y, menu_width, menu_height)
     
-    fn update(inout self):
+    fn update(mut self):
         """Update toolbar state."""
         # Reset pressed state after release
         if self.pressed_item >= 0:
@@ -923,16 +1079,19 @@ struct ToolBarInt(BaseWidgetInt):
 # Convenience functions
 fn create_dock_panel_int(x: Int32, y: Int32, width: Int32, height: Int32) -> DockPanelInt:
     """Create a dock panel system."""
-    return DockPanelInt(x, y, width, height)
+    var w = DockPanelInt(x, y, width, height)
+    return w^
 
 fn create_accordion_int(x: Int32, y: Int32, width: Int32, height: Int32,
                        mode: Int32 = ACCORDION_SINGLE) -> AccordionInt:
     """Create an accordion widget."""
-    return AccordionInt(x, y, width, height, mode)
+    var w = AccordionInt(x, y, width, height, mode)
+    return w^
 
 fn create_toolbar_int(x: Int32, y: Int32, width: Int32, height: Int32 = 32) -> ToolBarInt:
     """Create a toolbar."""
-    return ToolBarInt(x, y, width, height)
+    var w = ToolBarInt(x, y, width, height)
+    return w^
 
 # Demo function
 fn demo_advanced_widgets():

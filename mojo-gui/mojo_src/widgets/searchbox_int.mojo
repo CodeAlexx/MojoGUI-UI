@@ -4,12 +4,20 @@ Enhanced search field with icon, clear button, and search history.
 """
 
 from ..rendering_int import RenderingContextInt, ColorInt, PointInt, SizeInt, RectInt
-from ..widget_int import WidgetInt, BaseWidgetInt, MouseEventInt, KeyEventInt
+from .widget_events_int import MouseEventInt, KeyEventInt
 from .widget_constants import *
 
-struct SearchBoxInt(BaseWidgetInt):
+struct SearchBoxInt(Copyable, Movable):
     """Enhanced search box widget with features."""
-    
+
+    # Inlined BaseWidgetInt fields (struct inheritance is not supported).
+    var bounds: RectInt
+    var visible: Bool
+    var enabled: Bool
+    var background_color: ColorInt
+    var border_color: ColorInt
+    var border_width: Int32
+
     # Text content
     var text: String
     var placeholder: String
@@ -51,10 +59,16 @@ struct SearchBoxInt(BaseWidgetInt):
     var history_bg_color: ColorInt
     var history_hover_color: ColorInt
     
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32, height: Int32 = 30,
+    fn __init__(out self, x: Int32, y: Int32, width: Int32, height: Int32 = 30,
                 placeholder: String = "Search..."):
-        self.super().__init__(x, y, width, height)
-        
+        # Inlined BaseWidgetInt.__init__
+        self.bounds = RectInt(x, y, width, height)
+        self.visible = True
+        self.enabled = True
+        self.background_color = ColorInt(230, 230, 230, 255)
+        self.border_color = ColorInt(128, 128, 128, 255)
+        self.border_width = 1
+
         self.text = ""
         self.placeholder = placeholder
         self.cursor_position = 0
@@ -97,57 +111,92 @@ struct SearchBoxInt(BaseWidgetInt):
         self.background_color = ColorInt(255, 255, 255, 255)
         self.border_color = ColorInt(180, 180, 180, 255)
         self.border_width = 1
-    
+
+    # Inlined BaseWidgetInt methods (struct inheritance is not supported).
+    fn get_bounds(self) -> RectInt:
+        return self.bounds
+
+    fn set_bounds(mut self, bounds: RectInt):
+        self.bounds = bounds
+
+    fn is_visible(self) -> Bool:
+        return self.visible
+
+    fn set_visible(mut self, visible: Bool):
+        self.visible = visible
+
+    fn is_enabled(self) -> Bool:
+        return self.enabled
+
+    fn set_enabled(mut self, enabled: Bool):
+        self.enabled = enabled
+
+    fn contains_point(self, point: PointInt) -> Bool:
+        return self.bounds.contains(point)
+
+    fn render_background(self, ctx: RenderingContextInt):
+        if not self.visible:
+            return
+        _ = ctx.set_color(self.background_color.r, self.background_color.g,
+                          self.background_color.b, self.background_color.a)
+        _ = ctx.draw_filled_rectangle(self.bounds.x, self.bounds.y,
+                                      self.bounds.width, self.bounds.height)
+        if self.border_width > 0:
+            _ = ctx.set_color(self.border_color.r, self.border_color.g,
+                              self.border_color.b, self.border_color.a)
+            _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
+                                   self.bounds.width, self.bounds.height)
+
     fn get_text(self) -> String:
         """Get current search text."""
         return self.text
     
-    fn set_text(inout self, text: String):
+    fn set_text(mut self, text: String):
         """Set search text."""
         self.text = text
         self.cursor_position = len(text)
         self.clear_selection()
         self.scroll_to_cursor()
     
-    fn clear(inout self):
+    fn clear(mut self):
         """Clear search text."""
         self.text = ""
         self.cursor_position = 0
         self.clear_selection()
         self.scroll_offset = 0
     
-    fn perform_search(inout self):
+    fn perform_search(mut self):
         """Execute search with current text."""
         if len(self.text) > 0:
-            # Add to history
-            self.add_to_history(self.text)
-    
-    fn add_to_history(inout self, search_text: String):
+            # Add to history (pass a copy to avoid aliasing self.text with self)
+            self.add_to_history(String(self.text))
+
+    fn add_to_history(mut self, search_text: String):
         """Add search text to history."""
         # Remove if already exists
         for i in range(len(self.search_history)):
             if self.search_history[i] == search_text:
-                self.search_history.remove(i)
+                _ = self.search_history.pop(i)
                 break
-        
+
         # Add to front
         self.search_history.insert(0, search_text)
-        
+
         # Limit history size
-        while len(self.search_history) > self.max_history_items:
-            self.search_history.pop()
+        while len(self.search_history) > Int(self.max_history_items):
+            _ = self.search_history.pop()
     
-    fn show_search_history(inout self):
+    fn show_search_history(mut self):
         """Show search history dropdown."""
         self.show_history = True
         self.history_index = -1
     
-    fn hide_search_history(inout self):
+    fn hide_search_history(mut self):
         """Hide search history dropdown."""
         self.show_history = False
         self.history_index = -1
     
-    fn navigate_history(inout self, direction: Int32):
+    fn navigate_history(mut self, direction: Int32):
         """Navigate through search history."""
         if len(self.search_history) == 0:
             return
@@ -168,42 +217,42 @@ struct SearchBoxInt(BaseWidgetInt):
         else:
             self.set_text("")
     
-    fn clear_selection(inout self):
+    fn clear_selection(mut self):
         """Clear text selection."""
         self.selection_start = -1
         self.selection_end = -1
     
     fn has_selection(self) -> Bool:
         """Check if there's a selection."""
-        return self.selection_start >= 0 and self.selection_end >= 0 and 
-               self.selection_start != self.selection_end
+        return (self.selection_start >= 0 and self.selection_end >= 0 and
+                self.selection_start != self.selection_end)
     
-    fn delete_selection(inout self):
+    fn delete_selection(mut self):
         """Delete selected text."""
         if not self.has_selection():
             return
         
-        let start = min(self.selection_start, self.selection_end)
-        let end = max(self.selection_start, self.selection_end)
+        var start = min(self.selection_start, self.selection_end)
+        var end = max(self.selection_start, self.selection_end)
         
         self.text = self.text[:start] + self.text[end:]
         self.cursor_position = start
         self.clear_selection()
     
-    fn insert_at_cursor(inout self, insert_text: String):
+    fn insert_at_cursor(mut self, insert_text: String):
         """Insert text at cursor position."""
         if self.has_selection():
             self.delete_selection()
         
-        let before = self.text[:self.cursor_position]
-        let after = self.text[self.cursor_position:]
+        var before = self.text[:self.cursor_position]
+        var after = self.text[self.cursor_position:]
         self.text = before + insert_text + after
         self.cursor_position += len(insert_text)
         self.scroll_to_cursor()
     
-    fn move_cursor(inout self, delta: Int32, extend_selection: Bool = False):
+    fn move_cursor(mut self, delta: Int32, extend_selection: Bool = False):
         """Move cursor by delta characters."""
-        let new_pos = max(0, min(self.cursor_position + delta, len(self.text)))
+        var new_pos = max(0, min(self.cursor_position + delta, len(self.text)))
         
         if extend_selection:
             if self.selection_start < 0:
@@ -215,12 +264,12 @@ struct SearchBoxInt(BaseWidgetInt):
         self.cursor_position = new_pos
         self.scroll_to_cursor()
     
-    fn scroll_to_cursor(inout self):
+    fn scroll_to_cursor(mut self):
         """Ensure cursor is visible."""
-        let text_area_width = self.bounds.width - self.padding * 2 - self.icon_size - 
+        var text_area_width = self.bounds.width - self.padding * 2 - self.icon_size - 
                              self.button_width - 8
-        let char_width = self.font_size * 6 // 10
-        let cursor_x = self.cursor_position * char_width - self.scroll_offset
+        var char_width = self.font_size * 6 // 10
+        var cursor_x = self.cursor_position * char_width - self.scroll_offset
         
         if cursor_x < 0:
             self.scroll_offset = self.cursor_position * char_width
@@ -229,40 +278,41 @@ struct SearchBoxInt(BaseWidgetInt):
     
     fn get_text_area_rect(self) -> RectInt:
         """Get the text input area rectangle."""
-        let x = self.bounds.x + self.padding + self.icon_size + 4
-        let width = self.bounds.width - self.padding * 2 - self.icon_size - 
+        var x = self.bounds.x + self.padding + self.icon_size + 4
+        var width = self.bounds.width - self.padding * 2 - self.icon_size - 
                    self.button_width - 8
         return RectInt(x, self.bounds.y, width, self.bounds.height)
     
     fn get_clear_button_rect(self) -> RectInt:
         """Get clear button rectangle."""
-        let x = self.bounds.x + self.bounds.width - self.button_width - self.padding
+        var x = self.bounds.x + self.bounds.width - self.button_width - self.padding
         return RectInt(x, self.bounds.y + (self.bounds.height - self.button_width) // 2,
                       self.button_width, self.button_width)
     
     fn get_history_rect(self) -> RectInt:
         """Get history dropdown rectangle."""
-        let item_height = 24
-        let height = min(len(self.search_history), 8) * item_height + 4
+        var item_height = 24
+        var height = min(len(self.search_history), 8) * item_height + 4
         return RectInt(self.bounds.x, self.bounds.y + self.bounds.height,
                       self.bounds.width, height)
     
-    fn handle_mouse_event(inout self, event: MouseEventInt) -> Bool:
+    fn handle_mouse_event(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse events."""
         if not self.visible or not self.enabled:
             return False
         
-        let point = PointInt(event.x, event.y)
+        var point = PointInt(event.x, event.y)
         
         # Check history dropdown
         if self.show_history:
-            let history_rect = self.get_history_rect()
+            var history_rect = self.get_history_rect()
             if history_rect.contains(point):
-                let item_height = 24
-                let item_index = (event.y - history_rect.y - 2) // item_height
+                var item_height = 24
+                var item_index = (event.y - history_rect.y - 2) // item_height
                 
                 if event.pressed and item_index >= 0 and item_index < len(self.search_history):
-                    self.set_text(self.search_history[item_index])
+                    var chosen = String(self.search_history[item_index])
+                    self.set_text(chosen)
                     self.hide_search_history()
                     self.perform_search()
                 
@@ -274,7 +324,7 @@ struct SearchBoxInt(BaseWidgetInt):
             return False
         
         # Check clear button
-        let clear_rect = self.get_clear_button_rect()
+        var clear_rect = self.get_clear_button_rect()
         if clear_rect.contains(point) and len(self.text) > 0:
             self.hover_clear = True
             if event.pressed:
@@ -284,15 +334,15 @@ struct SearchBoxInt(BaseWidgetInt):
             self.hover_clear = False
         
         # Check text area
-        let text_rect = self.get_text_area_rect()
+        var text_rect = self.get_text_area_rect()
         if text_rect.contains(point):
             if event.pressed:
                 self.is_focused = True
                 
                 # Calculate cursor position
-                let char_width = self.font_size * 6 // 10
-                let relative_x = event.x - text_rect.x + self.scroll_offset
-                self.cursor_position = max(0, min(relative_x // char_width, len(self.text)))
+                var char_width = self.font_size * 6 // 10
+                var relative_x = event.x - text_rect.x + self.scroll_offset
+                self.cursor_position = max(Int32(0), min(relative_x // char_width, Int32(len(self.text))))
                 self.clear_selection()
             
             return True
@@ -305,7 +355,7 @@ struct SearchBoxInt(BaseWidgetInt):
         
         return True
     
-    fn handle_key_event(inout self, event: KeyEventInt) -> Bool:
+    fn handle_key_event(mut self, event: KeyEventInt) -> Bool:
         """Handle keyboard input."""
         if not self.visible or not self.enabled or not self.is_focused:
             return False
@@ -313,9 +363,9 @@ struct SearchBoxInt(BaseWidgetInt):
         if not event.pressed:
             return False
         
-        let key = event.key_code
-        let shift = event.shift_held
-        let ctrl = event.ctrl_held
+        var key = event.key_code
+        var shift = event.shift_held
+        var ctrl = event.ctrl_held
         
         # Navigation
         if key == KEY_LEFT:
@@ -372,23 +422,23 @@ struct SearchBoxInt(BaseWidgetInt):
         
         # Ctrl shortcuts
         elif ctrl:
-            if key == ord('A'):
+            if key == Int32(ord("A")):
                 self.selection_start = 0
                 self.selection_end = len(self.text)
                 return True
-            elif key == ord('C'):
+            elif key == Int32(ord("C")):
                 # Copy (would implement clipboard)
                 return True
-            elif key == ord('V'):
+            elif key == Int32(ord("V")):
                 # Paste (would implement clipboard)
                 return True
-            elif key == ord('X'):
+            elif key == Int32(ord("X")):
                 # Cut (would implement clipboard)
                 return True
         
         # Character input
         elif event.is_printable():
-            self.insert_at_cursor(chr(event.char_code))
+            self.insert_at_cursor(chr(Int(event.char_code)))
             
             # Trigger live search
             if self.live_search:
@@ -411,8 +461,8 @@ struct SearchBoxInt(BaseWidgetInt):
                                      self.bounds.width, self.bounds.height)
         
         # Search icon
-        let icon_x = self.bounds.x + self.padding
-        let icon_y = self.bounds.y + (self.bounds.height - self.icon_size) // 2
+        var icon_x = self.bounds.x + self.padding
+        var icon_y = self.bounds.y + (self.bounds.height - self.icon_size) // 2
         _ = ctx.set_color(self.icon_color.r, self.icon_color.g,
                          self.icon_color.b, self.icon_color.a)
         
@@ -421,15 +471,15 @@ struct SearchBoxInt(BaseWidgetInt):
         _ = ctx.draw_line(icon_x + 10, icon_y + 10, icon_x + 14, icon_y + 14, 2)
         
         # Text area
-        let text_rect = self.get_text_area_rect()
+        var text_rect = self.get_text_area_rect()
         
         # Selection
         if self.has_selection():
-            let char_width = self.font_size * 6 // 10
-            let start = min(self.selection_start, self.selection_end)
-            let end = max(self.selection_start, self.selection_end)
-            let sel_x = text_rect.x + (start * char_width - self.scroll_offset)
-            let sel_width = (end - start) * char_width
+            var char_width = self.font_size * 6 // 10
+            var start = min(self.selection_start, self.selection_end)
+            var end = max(self.selection_start, self.selection_end)
+            var sel_x = text_rect.x + (start * char_width - self.scroll_offset)
+            var sel_width = (end - start) * char_width
             
             _ = ctx.set_color(self.selection_color.r, self.selection_color.g,
                              self.selection_color.b, self.selection_color.a)
@@ -441,20 +491,20 @@ struct SearchBoxInt(BaseWidgetInt):
                              self.text_color.b, self.text_color.a)
             
             # Clip text to visible area (simplified)
-            let visible_text = self.text  # Would implement proper clipping
-            let text_x = text_rect.x - self.scroll_offset
-            let text_y = text_rect.y + (text_rect.height - self.font_size) // 2
+            var visible_text = self.text  # Would implement proper clipping
+            var text_x = text_rect.x - self.scroll_offset
+            var text_y = text_rect.y + (text_rect.height - self.font_size) // 2
             _ = ctx.draw_text(visible_text, text_x, text_y, self.font_size)
         else:
             _ = ctx.set_color(self.placeholder_color.r, self.placeholder_color.g,
                              self.placeholder_color.b, self.placeholder_color.a)
-            let text_y = text_rect.y + (text_rect.height - self.font_size) // 2
+            var text_y = text_rect.y + (text_rect.height - self.font_size) // 2
             _ = ctx.draw_text(self.placeholder, text_rect.x, text_y, self.font_size)
         
         # Cursor
         if self.is_focused and (self.cursor_blink_time // 30) % 2 == 0:
-            let char_width = self.font_size * 6 // 10
-            let cursor_x = text_rect.x + (self.cursor_position * char_width - self.scroll_offset)
+            var char_width = self.font_size * 6 // 10
+            var cursor_x = text_rect.x + (self.cursor_position * char_width - self.scroll_offset)
             
             _ = ctx.set_color(self.cursor_color.r, self.cursor_color.g,
                              self.cursor_color.b, self.cursor_color.a)
@@ -462,18 +512,18 @@ struct SearchBoxInt(BaseWidgetInt):
         
         # Clear button
         if len(self.text) > 0:
-            let clear_rect = self.get_clear_button_rect()
-            let color = self.button_hover_color if self.hover_clear else self.button_color
+            var clear_rect = self.get_clear_button_rect()
+            var color = self.button_hover_color if self.hover_clear else self.button_color
             _ = ctx.set_color(color.r, color.g, color.b, color.a)
             
             # Draw X
-            let cx = clear_rect.x + clear_rect.width // 2
-            let cy = clear_rect.y + clear_rect.height // 2
+            var cx = clear_rect.x + clear_rect.width // 2
+            var cy = clear_rect.y + clear_rect.height // 2
             _ = ctx.draw_line(cx - 5, cy - 5, cx + 5, cy + 5, 2)
             _ = ctx.draw_line(cx - 5, cy + 5, cx + 5, cy - 5, 2)
         
         # Border
-        let border_color = self.icon_color if self.is_focused else self.border_color
+        var border_color = self.icon_color if self.is_focused else self.border_color
         _ = ctx.set_color(border_color.r, border_color.g,
                          border_color.b, border_color.a)
         _ = ctx.draw_rectangle(self.bounds.x, self.bounds.y,
@@ -485,7 +535,7 @@ struct SearchBoxInt(BaseWidgetInt):
     
     fn render_history_dropdown(self, ctx: RenderingContextInt):
         """Render search history dropdown."""
-        let rect = self.get_history_rect()
+        var rect = self.get_history_rect()
         
         # Shadow
         _ = ctx.set_color(0, 0, 0, 30)
@@ -497,14 +547,14 @@ struct SearchBoxInt(BaseWidgetInt):
         _ = ctx.draw_filled_rectangle(rect.x, rect.y, rect.width, rect.height)
         
         # Items
-        let item_height = 24
-        let visible_items = min(len(self.search_history), 8)
+        var item_height = 24
+        var visible_items = min(len(self.search_history), 8)
         
         for i in range(visible_items):
-            let item_y = rect.y + 2 + i * item_height
+            var item_y = rect.y + 2 + i * item_height
             
             # Hover background
-            if i == self.history_index:
+            if i == Int(self.history_index):
                 _ = ctx.set_color(self.history_hover_color.r, self.history_hover_color.g,
                                  self.history_hover_color.b, self.history_hover_color.a)
                 _ = ctx.draw_filled_rectangle(rect.x + 2, item_y, rect.width - 4, item_height)
@@ -512,8 +562,8 @@ struct SearchBoxInt(BaseWidgetInt):
             # Clock icon
             _ = ctx.set_color(self.icon_color.r, self.icon_color.g,
                              self.icon_color.b, self.icon_color.a)
-            let icon_x = rect.x + 8
-            let icon_y_center = item_y + item_height // 2
+            var icon_x = rect.x + 8
+            var icon_y_center = item_y + item_height // 2
             _ = ctx.draw_circle(icon_x + 6, icon_y_center, 5, 12)
             _ = ctx.draw_line(icon_x + 6, icon_y_center, icon_x + 6, icon_y_center - 3, 1)
             _ = ctx.draw_line(icon_x + 6, icon_y_center, icon_x + 9, icon_y_center, 1)
@@ -528,7 +578,7 @@ struct SearchBoxInt(BaseWidgetInt):
                          self.border_color.b, self.border_color.a)
         _ = ctx.draw_rectangle(rect.x, rect.y, rect.width, rect.height)
     
-    fn update(inout self):
+    fn update(mut self):
         """Update search box state."""
         if self.is_focused:
             self.cursor_blink_time += 1
@@ -542,7 +592,7 @@ struct SearchBoxInt(BaseWidgetInt):
                 self.perform_search()
                 self.last_search_time = 0
     
-    fn set_focus(inout self, focused: Bool):
+    fn set_focus(mut self, focused: Bool):
         """Set focus state."""
         self.is_focused = focused
         if not focused:
