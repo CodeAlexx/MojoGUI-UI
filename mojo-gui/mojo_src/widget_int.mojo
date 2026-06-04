@@ -13,7 +13,7 @@ struct MouseEventInt:
     var button: Int32
     var pressed: Bool
     
-    fn __init__(inout self, x: Int32, y: Int32, button: Int32, pressed: Bool):
+    fn __init__(out self, x: Int32, y: Int32, button: Int32, pressed: Bool):
         self.x = x
         self.y = y
         self.button = button
@@ -24,7 +24,7 @@ struct KeyEventInt:
     var key_code: Int32
     var pressed: Bool
     
-    fn __init__(inout self, key_code: Int32, pressed: Bool):
+    fn __init__(out self, key_code: Int32, pressed: Bool):
         self.key_code = key_code
         self.pressed = pressed
 
@@ -36,7 +36,7 @@ trait WidgetInt:
         """Get the widget's bounding rectangle."""
         ...
     
-    fn set_bounds(inout self, bounds: RectInt):
+    fn set_bounds(mut self, bounds: RectInt):
         """Set the widget's bounding rectangle."""
         ...
     
@@ -44,7 +44,7 @@ trait WidgetInt:
         """Check if widget is visible."""
         ...
     
-    fn set_visible(inout self, visible: Bool):
+    fn set_visible(mut self, visible: Bool):
         """Set widget visibility."""
         ...
     
@@ -52,11 +52,11 @@ trait WidgetInt:
         """Check if point is inside widget."""
         ...
     
-    fn handle_mouse_event(inout self, event: MouseEventInt) -> Bool:
+    fn handle_mouse_event(mut self, event: MouseEventInt) -> Bool:
         """Handle mouse event. Returns True if handled."""
         ...
     
-    fn handle_key_event(inout self, event: KeyEventInt) -> Bool:
+    fn handle_key_event(mut self, event: KeyEventInt) -> Bool:
         """Handle key event. Returns True if handled."""
         ...
     
@@ -64,7 +64,7 @@ trait WidgetInt:
         """Render the widget."""
         ...
     
-    fn update(inout self):
+    fn update(mut self):
         """Update widget state (called each frame)."""
         ...
 
@@ -79,7 +79,7 @@ struct BaseWidgetInt:
     var border_color: ColorInt
     var border_width: Int32
     
-    fn __init__(inout self, x: Int32, y: Int32, width: Int32, height: Int32):
+    fn __init__(out self, x: Int32, y: Int32, width: Int32, height: Int32):
         self.bounds = RectInt(x, y, width, height)
         self.visible = True
         self.enabled = True
@@ -90,19 +90,19 @@ struct BaseWidgetInt:
     fn get_bounds(self) -> RectInt:
         return self.bounds
     
-    fn set_bounds(inout self, bounds: RectInt):
+    fn set_bounds(mut self, bounds: RectInt):
         self.bounds = bounds
     
     fn is_visible(self) -> Bool:
         return self.visible
     
-    fn set_visible(inout self, visible: Bool):
+    fn set_visible(mut self, visible: Bool):
         self.visible = visible
     
     fn is_enabled(self) -> Bool:
         return self.enabled
     
-    fn set_enabled(inout self, enabled: Bool):
+    fn set_enabled(mut self, enabled: Bool):
         self.enabled = enabled
     
     fn contains_point(self, point: PointInt) -> Bool:
@@ -135,13 +135,13 @@ struct EventManagerInt:
     var last_mouse_x: Int32
     var last_mouse_y: Int32
     
-    fn __init__(inout self):
+    fn __init__(out self):
         self.mouse_x = 0
         self.mouse_y = 0
         self.last_mouse_x = 0
         self.last_mouse_y = 0
     
-    fn update(inout self, ctx: RenderingContextInt):
+    fn update(mut self, ctx: RenderingContextInt):
         """Update events from rendering context."""
         # Poll events
         _ = ctx.poll_events()
