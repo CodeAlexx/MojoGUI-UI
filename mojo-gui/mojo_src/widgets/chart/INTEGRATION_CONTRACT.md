@@ -96,3 +96,23 @@ Rectangle/FibRetracement with begin/drag/commit + hit_test, coords in (bar_index
   GPU busy). chart_demo must actually build a ChartInt, set bars, set each ChartType, and call render
   paths so every module is elaborated. Add a `_check_all.mojo` root harness if chart_demo doesn't
   exercise studies/drawings.
+
+## SHIPPED API NOTES (bug-fixer, phase-2 — reconciles this doc to the code)
+The contract above is the design target; the shipped code matches it with these
+clarifications (skeptic #9 doc-drift):
+- **ChartInt fields**: the engine stores `data: BarData` (not a bare `bars: List[Bar]`),
+  the unpacked `*_color: ColorInt` palette PLUS `theme: ChartTheme`, and
+  `baseline_value: Float64` (from `ChartConfig.baseline`). `set_bars(var List[Bar])`
+  and `set_data(BarData)` both exist; `set_theme(ChartTheme)` and the lower-level
+  `set_theme_colors(...)` both exist.
+- **Geometry**: `create_chart_int(x,y,w,h)` builds at given bounds; `ChartBuilder.build()`
+  takes NO geometry (builds at a default canvas; callers set `x/y/width/height` after).
+- **Render path**: `render`/`draw` build the contract `RenderView` (NOT the old
+  `ViewGeom`/`RenderColors`) and call `renderers.draw_series(ctx, view, bars, ct)`.
+  Renderers OWN the transforms — `draw_series` dispatches each Japanese/Range/Heikin
+  type to a dedicated `draw_*` that runs `transforms.*` internally; the engine always
+  passes the raw visible slice. The 6 transform renderers locally refit the price
+  domain to their transformed series (so bricks/columns never clip).
+- **Math**: scales/renderers use `mathx.cln/clog10/cexp/csin/ccos/ctan` (pure Mojo, no
+  libm) so the FFI-linked demos LINK — `math.log10`/`sincos` fail to resolve in
+  `chart_demo`/`chart_all_demo`.

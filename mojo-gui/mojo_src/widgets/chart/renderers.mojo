@@ -137,11 +137,14 @@ struct RenderView(ImplicitlyCopyable, Movable):
     """Upper bound of the visible price window."""
     var theme: ChartTheme
     """Resolved colors for this frame (from the engine's active preset)."""
+    var baseline: Float64
+    """Reference value for Baseline charts (from `ChartConfig.baseline`,
+    default 0.0); the baseline renderer splits color at `value >= baseline`."""
 
     fn __init__(out self, area_x: Int32, area_y: Int32, area_w: Int32,
                 area_h: Int32, first_idx: Int, bars_visible: Int,
                 bar_width: Int32, price_min: Float64, price_max: Float64,
-                theme: ChartTheme):
+                theme: ChartTheme, baseline: Float64 = 0.0):
         self.area_x = area_x
         self.area_y = area_y
         self.area_w = area_w
@@ -152,6 +155,7 @@ struct RenderView(ImplicitlyCopyable, Movable):
         self.price_min = price_min
         self.price_max = price_max
         self.theme = theme
+        self.baseline = baseline
 
     fn x_for(self, i: Int) -> Int32:
         """Bar index -> center X (contract formula)."""
@@ -191,6 +195,26 @@ fn _round_i32(v: Float64) -> Int32:
     if v >= 0.0:
         return Int32(v + 0.5)
     return Int32(v - 0.5)
+
+
+fn _refit_view(view: RenderView, data_min: Float64, data_max: Float64) -> RenderView:
+    """Return a copy of `view` with its price domain refit to [data_min, data_max].
+
+    The transform-based renderers (Renko/Kagi/Range/LineBreak/PnF) produce a
+    series whose prices (box-snapped opens/closes, range tops, kagi turns) can
+    fall outside the engine's raw-bar auto-fit, which would map them off the
+    plot rect.  This refits Y to the transformed series' own range, with the
+    same asymmetric 20%/10% margins the engine uses (pricescale.rs), so the
+    elements always land inside the price rect.  Geometry (area_*, x stride) is
+    untouched — only `price_min`/`price_max` change, so `y_for` is rescaled.
+    """
+    var lv = view.copy()
+    var rng = data_max - data_min
+    if rng < 1e-9:
+        rng = abs(data_max) if data_max != 0.0 else 1.0
+    lv.price_min = data_min - rng * 0.1
+    lv.price_max = data_max + rng * 0.2
+    return lv^
 
 
 fn _alpha(c: ColorInt, a: Int32) -> ColorInt:
@@ -451,16 +475,27 @@ fn draw_heikin_ashi(ctx: RenderingContextInt, view: RenderView,
     """
     var ha = to_heikin_ashi(bars)
     var n = len(ha)
+    if n == 0:
+        return
+    # Refit Y to the HA series' own range (HA opens/closes differ from raw bars).
+    var hmin = ha[0].low
+    var hmax = ha[0].high
+    for i in range(n):
+        if ha[i].low < hmin:
+            hmin = ha[i].low
+        if ha[i].high > hmax:
+            hmax = ha[i].high
+    var lv = _refit_view(view, hmin, hmax)
     for i in range(n):
         var bar = ha[i]
         var x = view.x_for(i)
         var color = _pick(bar.close >= bar.open, view.theme.bull,
                           view.theme.bear)
 
-        var y_high = view.y_for(bar.high)
-        var y_low = view.y_for(bar.low)
-        var y_open = view.y_for(bar.open)
-        var y_close = view.y_for(bar.close)
+        var y_high = lv.y_for(bar.high)
+        var y_low = lv.y_for(bar.low)
+        var y_open = lv.y_for(bar.open)
+        var y_close = lv.y_for(bar.close)
         var body_top = min(y_open, y_close)
         var body_bottom = max(y_open, y_close)
 
@@ -634,16 +669,16 @@ fn draw_hlc_area(ctx: RenderingContextInt, view: RenderView, bars: List[Bar],
 
 fn draw_baseline(ctx: RenderingContextInt, view: RenderView, bars: List[Bar],
                  price_source: Int32 = PS_CLOSE):
-    """Baseline chart (port of `render_baseline`).
+    """Baseline chart (port of `render_baseline` / series/baseline.rs).
 
-    Baseline = first visible bar's price-source value.  Segments are colored
+    Baseline reference = `view.baseline` (from `ChartConfig.baseline`, default
+    0.0; skeptic #5 — was the first visible value).  Segments are colored
     bull/bear by whether their end value is >= the baseline, with a faint fill.
     """
     var n = len(bars)
     if n == 0:
         return
-    var first = bars[0]
-    var baseline = price_source_compute(price_source, first.open, first.high, first.low, first.close)
+    var baseline = view.baseline
     var baseline_y = view.y_for(baseline)
 
     # Baseline reference line across the price rect (theme baseline color).
@@ -705,6 +740,15 @@ fn draw_range_bars(ctx: RenderingContextInt, view: RenderView, bars: List[Bar]):
         return
     if count > _MAX_ELEMENTS:
         count = _MAX_ELEMENTS
+    # Refit Y to the range bars' own high/low span.
+    var rmin = rb[0].low
+    var rmax = rb[0].high
+    for i in range(count):
+        if rb[i].low < rmin:
+            rmin = rb[i].low
+        if rb[i].high > rmax:
+            rmax = rb[i].high
+    var lv = _refit_view(view, rmin, rmax)
     var spacing_f = Float64(view.area_w) / Float64(count)
     var half = view.bar_width // 2
     if half < 1:
@@ -713,8 +757,8 @@ fn draw_range_bars(ctx: RenderingContextInt, view: RenderView, bars: List[Bar]):
         var bar = rb[i]
         var xf = Float64(view.area_x) + (Float64(i) + 0.5) * spacing_f
         var x = _round_i32(xf)
-        var y_open = view.y_for(bar.open)
-        var y_close = view.y_for(bar.close)
+        var y_open = lv.y_for(bar.open)
+        var y_close = lv.y_for(bar.close)
         var color = _pick(bar.close > bar.open, view.theme.bull, view.theme.bear)
         _set(ctx, color)
         _filled_rect_minmax(ctx, x - half, y_open, x + half, y_close)
@@ -746,6 +790,19 @@ fn draw_renko(ctx: RenderingContextInt, view: RenderView, bars: List[Bar]):
         return
     if count > _MAX_ELEMENTS:
         count = _MAX_ELEMENTS
+    # Refit Y to the bricks' own price span (bricks snap to box boundaries and
+    # can exceed the raw-bar range).
+    var bmin = bricks[0].open
+    var bmax = bricks[0].open
+    for i in range(count):
+        var b = bricks[i]
+        var blo = min(b.open, b.close)
+        var bhi = max(b.open, b.close)
+        if blo < bmin:
+            bmin = blo
+        if bhi > bmax:
+            bmax = bhi
+    var lv = _refit_view(view, bmin, bmax)
     var spacing = _calc_spacing(view.area_w, count, view.bar_width)
     var bw = _round_i32(Float64(spacing) * 0.85)
     if bw < 3:
@@ -759,8 +816,8 @@ fn draw_renko(ctx: RenderingContextInt, view: RenderView, bars: List[Bar]):
         if x < view.area_x or x > view.area_x + view.area_w:
             continue
         var color = _pick(bar.close > bar.open, view.theme.bull, view.theme.bear)
-        var y_open = view.y_for(bar.open)
-        var y_close = view.y_for(bar.close)
+        var y_open = lv.y_for(bar.open)
+        var y_close = lv.y_for(bar.close)
         var top = min(y_open, y_close)
         var bottom = max(y_open, y_close)
         if bottom - top < 2:
@@ -781,6 +838,18 @@ fn draw_kagi(ctx: RenderingContextInt, view: RenderView, bars: List[Bar]):
         return
     if count > _MAX_ELEMENTS:
         count = _MAX_ELEMENTS
+    # Refit Y to the kagi turns' own price range.
+    var kmin = lines[0].start_price
+    var kmax = lines[0].start_price
+    for i in range(count):
+        var s = lines[i]
+        var slo = min(s.start_price, s.end_price)
+        var shi = max(s.start_price, s.end_price)
+        if slo < kmin:
+            kmin = slo
+        if shi > kmax:
+            kmax = shi
+    var lv = _refit_view(view, kmin, kmax)
     var spacing_f = Float64(view.area_w) / Float64(count)
     if spacing_f < 2.0:
         spacing_f = 2.0
@@ -794,8 +863,8 @@ fn draw_kagi(ctx: RenderingContextInt, view: RenderView, bars: List[Bar]):
         var x = _round_i32(xf)
         if x < view.area_x or x > view.area_x + view.area_w:
             continue
-        var y_start = view.y_for(seg.start_price)
-        var y_end = view.y_for(seg.end_price)
+        var y_start = lv.y_for(seg.start_price)
+        var y_end = lv.y_for(seg.end_price)
         if len(px) == 0:
             px.append(x)
             py.append(y_start)
@@ -836,6 +905,18 @@ fn draw_line_break(ctx: RenderingContextInt, view: RenderView, bars: List[Bar]):
         return
     if count > _MAX_ELEMENTS:
         count = _MAX_ELEMENTS
+    # Refit Y to the line-break blocks' own open/close span.
+    var lmin = lines[0].open
+    var lmax = lines[0].open
+    for i in range(count):
+        var ln = lines[i]
+        var llo = min(ln.open, ln.close)
+        var lhi = max(ln.open, ln.close)
+        if llo < lmin:
+            lmin = llo
+        if lhi > lmax:
+            lmax = lhi
+    var lv = _refit_view(view, lmin, lmax)
     var spacing_f = Float64(view.area_w) / Float64(count)
     var aw = _round_i32(spacing_f * 0.85)
     if aw > view.bar_width:
@@ -851,8 +932,8 @@ fn draw_line_break(ctx: RenderingContextInt, view: RenderView, bars: List[Bar]):
         if x < view.area_x or x > view.area_x + view.area_w:
             continue
         var color = _pick(line.is_bullish(), view.theme.bull, view.theme.bear)
-        var y_open = view.y_for(line.open)
-        var y_close = view.y_for(line.close)
+        var y_open = lv.y_for(line.open)
+        var y_close = lv.y_for(line.close)
         var top = min(y_open, y_close)
         var bottom = max(y_open, y_close)
         if bottom - top < 2:
@@ -889,6 +970,18 @@ fn draw_point_and_figure(ctx: RenderingContextInt, view: RenderView,
         return
     if count > 1000:
         count = 1000
+    # Refit Y to the columns' own box-price range.
+    var pmin = columns[0].start_price
+    var pmax = columns[0].start_price
+    for i in range(count):
+        var c = columns[i]
+        var clo = min(c.start_price, c.end_price)
+        var chi = max(c.start_price, c.end_price)
+        if clo < pmin:
+            pmin = clo
+        if chi > pmax:
+            pmax = chi
+    var lv = _refit_view(view, pmin, pmax)
     var spacing_f = Float64(view.area_w) / Float64(count)
     var sym = spacing_f * 0.7
     var cap = Float64(view.bar_width) * 0.8
@@ -916,7 +1009,7 @@ fn draw_point_and_figure(ctx: RenderingContextInt, view: RenderView,
         if col.direction == PNF_UP:
             var price = col.start_price
             while price <= col.end_price and box_count < _MAX_BOXES_PER_COLUMN:
-                var y = view.y_for(price)
+                var y = lv.y_for(price)
                 if y >= top_y and y <= bot_y:
                     _x_symbol(ctx, x, y, half, view.theme.bull)
                 price += box_size
@@ -924,7 +1017,7 @@ fn draw_point_and_figure(ctx: RenderingContextInt, view: RenderView,
         else:
             var price = col.start_price
             while price >= col.end_price and box_count < _MAX_BOXES_PER_COLUMN:
-                var y = view.y_for(price)
+                var y = lv.y_for(price)
                 if y >= top_y and y <= bot_y:
                     _o_symbol(ctx, x, y, half, view.theme.bear)
                 price -= box_size

@@ -396,12 +396,14 @@ comptime LB_DOWN: Int32 = 1
 comptime LB_MAX_LINES: Int = 10_000
 """Safety cap on line count (line_break.rs `MAX_LINES`)."""
 
-# LineBreakSignal (line_break.rs).
-comptime LB_SIGNAL_NONE: Int32 = 0
-comptime LB_SIGNAL_BULLISH: Int32 = 1
-comptime LB_SIGNAL_BEARISH: Int32 = 2
-comptime LB_SIGNAL_BULLISH_REVERSAL: Int32 = 3
-comptime LB_SIGNAL_BEARISH_REVERSAL: Int32 = 4
+# LineBreakSignal (line_break.rs) — numeric order matches the Rust enum
+# declaration (skeptic #10).  All references are by name and detect_signal has
+# no external callers comparing the numeric values, so the order is internal.
+comptime LB_SIGNAL_BULLISH: Int32 = 0
+comptime LB_SIGNAL_BEARISH: Int32 = 1
+comptime LB_SIGNAL_BULLISH_REVERSAL: Int32 = 2
+comptime LB_SIGNAL_BEARISH_REVERSAL: Int32 = 3
+comptime LB_SIGNAL_NONE: Int32 = 4
 
 
 struct LineBreakLine(ImplicitlyCopyable, Movable):

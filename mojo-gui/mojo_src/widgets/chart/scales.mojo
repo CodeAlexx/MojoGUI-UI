@@ -25,7 +25,11 @@ timestamp into Y/M/D/h/m/s with a self-contained civil-date routine
 ladder (`_calculate_optimal_interval`) and label hierarchy are ported verbatim.
 """
 
-from math import log, log10, exp, floor, ceil
+from math import floor, ceil
+# log/log10/exp routed through the pure-Mojo mathx versions (no libm) so the
+# FFI-linked chart demos LINK — math.log10 pulls `log10@GLIBC` which fails to
+# resolve in chart_demo/chart_all_demo (same class as the sincos issue).
+from .mathx import cln as log, clog10 as log10, cexp as exp
 from .model import Bar, BarData, Timeframe
 
 
@@ -515,9 +519,13 @@ struct PriceMarkGenerator(ImplicitlyCopyable, Movable):
                               height_pixels: Float64, rect_min_y: Float64,
                               rect_max_y: Float64) -> List[PriceMark]:
         """Marks for a linear scale (port of `generate_linear_marks`)."""
+        # NaN guard (skeptic #11): a NaN bound poisons every comparison below
+        # (NaN is its own only non-equal value), so bail to empty marks.
+        if min_price != min_price or max_price != max_price:
+            return List[PriceMark]()
         var price_range = max_price - min_price
         # Guard zero/tiny range (Rust: f64::EPSILON * 1000.0).
-        if price_range <= 2.220446049250313e-13:
+        if price_range != price_range or price_range <= 2.220446049250313e-13:
             return List[PriceMark]()
 
         var target_marks = _min_f64(
@@ -553,6 +561,9 @@ struct PriceMarkGenerator(ImplicitlyCopyable, Movable):
                            height_pixels: Float64, rect_min_y: Float64,
                            rect_max_y: Float64) -> List[PriceMark]:
         """Marks for a logarithmic scale (port of `generate_log_marks`)."""
+        # NaN guard (skeptic #11): NaN bounds make the <=/>= checks unreliable.
+        if min_price != min_price or max_price != max_price:
+            return List[PriceMark]()
         if (min_price <= 0.0 or max_price <= 0.0 or min_price >= max_price):
             return List[PriceMark]()
 

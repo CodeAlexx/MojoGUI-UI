@@ -122,6 +122,10 @@ struct ChartConfig(ImplicitlyCopyable, Movable):
     var price_scale_mode: Int32
     """Active price-scale mode (`PS_*`, Rust `right_axis_scale_mode`). Default Normal."""
 
+    var baseline: Float64
+    """Reference value for Baseline charts (port of `BaselineSeriesOptions::baseline`,
+    series/baseline.rs:31). The color split is `value >= baseline`. Default 0.0."""
+
     var crosshair: CrosshairConfig
     """Crosshair behavior/visibility options (Rust `ChartOptions.crosshair`)."""
 
@@ -132,4 +136,5 @@ struct ChartConfig(ImplicitlyCopyable, Movable):
         self.show_axes = True
         self.bar_spacing = 8
         self.price_scale_mode = PS_NORMAL
+        self.baseline = 0.0
         self.crosshair = CrosshairConfig()

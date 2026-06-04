@@ -45,6 +45,7 @@ from .model import Bar, BarData, ChartType, CT_CANDLES
 from .renderers import draw_series, RenderView
 from .theme import ChartTheme
 from .config import ChartConfig
+from .scales import PriceMarkGenerator, PriceMark
 
 # Mouse buttons (match widget_constants.mojo / GLFW).
 comptime MB_LEFT: Int32 = 0
@@ -64,6 +65,9 @@ comptime KEY_C: Int32 = 67           # 'C'       : toggle crosshair
 comptime MIN_BAR_SPACING: Float64 = 1.0
 comptime MAX_BAR_SPACING: Float64 = 100.0
 comptime DEFAULT_BAR_SPACING: Float64 = 8.0
+comptime DEFAULT_RIGHT_OFFSET: Float64 = 2.5
+"""Bars of empty whitespace kept at the right edge after a reset (port of the
+Rust default right_offset; skeptic #7 — reset_view used to slam to 0.0)."""
 
 # Axis gutter sizes in pixels (price labels on the right, time labels at bottom).
 comptime PRICE_AXIS_WIDTH: Int32 = 60
@@ -104,6 +108,10 @@ struct ChartInt(Copyable, Movable):
     Kept in addition to the unpacked palette fields below so the engine can hand
     a full `ChartTheme` to `draw_series`; `set_theme`/`set_theme_colors` keep the
     two representations in sync."""
+    var baseline_value: Float64
+    """Reference value for Baseline charts (from `ChartConfig.baseline`, default
+    0.0); passed into the `RenderView` so the baseline renderer splits color at
+    `value >= baseline` rather than the first visible value (skeptic #5)."""
 
     # ----- Time-axis view state (port of TimeScale fields) -----------------
     # We track `right_offset` in fractional bar units and `bar_spacing` in
@@ -167,6 +175,7 @@ struct ChartInt(Copyable, Movable):
         self.data = BarData()
         self.chart_type = ChartType(CT_CANDLES)
         self.theme = ChartTheme.dark()
+        self.baseline_value = 0.0
 
         self.bar_spacing = DEFAULT_BAR_SPACING
         self.right_offset = 0.0
@@ -256,9 +265,10 @@ struct ChartInt(Copyable, Movable):
                               theme.bear)
 
     fn set_config(mut self, cfg: ChartConfig):
-        """Apply the contract `ChartConfig` visibility toggles."""
+        """Apply the contract `ChartConfig` visibility toggles + baseline value."""
         self.show_grid = cfg.show_grid
         self.show_crosshair = cfg.show_crosshair
+        self.baseline_value = cfg.baseline
 
     fn set_visible_bars(mut self, n: Int):
         """Set the initial viewport bar count (contract `set_visible_bars`).
@@ -448,10 +458,11 @@ struct ChartInt(Copyable, Movable):
         if rng < 1e-9:
             # Degenerate (flat) range: pad around the single value.
             rng = abs(dmax) if dmax != 0.0 else 1.0
-        # 5% padding top and bottom (PriceScale default margin).
-        var pad = rng * 0.05
-        self.price_min = dmin - pad
-        self.price_max = dmax + pad
+        # Asymmetric margins faithful to pricescale.rs:227-230 (skeptic #6):
+        #   price_min = data_min - range*bottom(0.1); price_max = data_max + range*top(0.2)
+        # Matches scales.PriceScale.margin_top/margin_bottom defaults.
+        self.price_min = dmin - rng * 0.1
+        self.price_max = dmax + rng * 0.2
 
     # =====================================================================
     # Pan / zoom primitives (port of pan_zoom.rs)
@@ -535,8 +546,9 @@ struct ChartInt(Copyable, Movable):
         """Jump to the latest bar, reset spacing, and re-enable price auto-fit.
 
         Port of double-click reset: `jump_to_latest` + re-enable auto-scale.
+        Keeps `DEFAULT_RIGHT_OFFSET` bars of right-edge whitespace (skeptic #7).
         """
-        self.right_offset = 0.0
+        self.right_offset = DEFAULT_RIGHT_OFFSET
         self.bar_spacing = DEFAULT_BAR_SPACING
         self.price_auto = True
         self.auto_fit_price()
@@ -734,7 +746,7 @@ struct ChartInt(Copyable, Movable):
             area_x, self.plot_y(), self.plot_width(), self.plot_height(),
             0, len(visible), bar_w,
             self.price_min, self.price_max,
-            self.theme,
+            self.theme, self.baseline_value,
         )
 
         draw_series(ctx, view, visible, self.chart_type)
@@ -763,11 +775,24 @@ struct ChartInt(Copyable, Movable):
             _ = ctx.draw_line(gx, self.plot_y(), gx, self.plot_bottom(), 1)
             gx += px_step
 
-        # Horizontal grid lines at the price label levels (5 divisions).
-        var divisions: Int32 = 5
-        for i in range(divisions + 1):
-            var yy = self.plot_y() + (self.plot_height() * i) // divisions
-            _ = ctx.draw_line(self.plot_x(), yy, self.plot_right(), yy, 1)
+        # Horizontal grid lines at nice-number price levels (skeptic #8) via the
+        # ported PriceMarkGenerator, instead of a fixed 5-way split.  Falls back
+        # to a 5-division split if the generator yields nothing (degenerate range).
+        var gen = PriceMarkGenerator()
+        var marks = gen.generate_marks(
+            self.price_min, self.price_max, Float64(self.plot_height()),
+            0,  # PS_NORMAL — engine price_to_y is linear
+            Float64(self.plot_y()), Float64(self.plot_bottom()),
+        )
+        if len(marks) > 0:
+            for i in range(len(marks)):
+                var yy = Int32(marks[i].y_coord)
+                _ = ctx.draw_line(self.plot_x(), yy, self.plot_right(), yy, 1)
+        else:
+            var divisions: Int32 = 5
+            for i in range(divisions + 1):
+                var yy = self.plot_y() + (self.plot_height() * i) // divisions
+                _ = ctx.draw_line(self.plot_x(), yy, self.plot_right(), yy, 1)
 
     fn _draw_axes(self, ctx: RenderingContextInt):
         """Draw the price axis (right) and time axis (bottom) with labels."""
@@ -781,23 +806,41 @@ struct ChartInt(Copyable, Movable):
         _ = ctx.draw_line(self.plot_x(), self.plot_bottom(),
                           self.plot_right(), self.plot_bottom(), 1)
 
-        # ----- Price labels on the right gutter (5 divisions, top=max) -----
+        # ----- Price labels on the right gutter at nice-number levels -----
+        # Uses the ported PriceMarkGenerator (skeptic #8) so labels land on round
+        # prices and align with the horizontal gridlines.  Falls back to a fixed
+        # 5-division split for a degenerate range.
         _ = ctx.set_color(self.text_color.r, self.text_color.g,
                           self.text_color.b, self.text_color.a)
-        var divisions: Int32 = 5
-        for i in range(divisions + 1):
-            var yy = self.plot_y() + (self.plot_height() * i) // divisions
-            # i=0 at top -> price_max; i=divisions at bottom -> price_min.
-            var ratio = 1.0 - Float64(i) / Float64(divisions)
-            var price = self.price_min + ratio * (self.price_max - self.price_min)
-            var label = _format_price(price)
-            # Nudge the first/last labels inward so they stay on-screen.
-            var ty = yy - 6
-            if i == 0:
-                ty = yy + 1
-            if i == divisions:
-                ty = yy - 12
-            _ = ctx.draw_text(label, self.plot_right() + 4, ty, 10)
+        var gen = PriceMarkGenerator()
+        var pmarks = gen.generate_marks(
+            self.price_min, self.price_max, Float64(self.plot_height()),
+            0,  # PS_NORMAL
+            Float64(self.plot_y()), Float64(self.plot_bottom()),
+        )
+        if len(pmarks) > 0:
+            for i in range(len(pmarks)):
+                var yy = Int32(pmarks[i].y_coord)
+                # Keep labels inside the plot vertically.
+                var ty = yy - 6
+                if ty < self.plot_y():
+                    ty = self.plot_y() + 1
+                if ty > self.plot_bottom() - 12:
+                    ty = self.plot_bottom() - 12
+                _ = ctx.draw_text(pmarks[i].label, self.plot_right() + 4, ty, 10)
+        else:
+            var divisions: Int32 = 5
+            for i in range(divisions + 1):
+                var yy = self.plot_y() + (self.plot_height() * i) // divisions
+                var ratio = 1.0 - Float64(i) / Float64(divisions)
+                var price = self.price_min + ratio * (self.price_max - self.price_min)
+                var label = _format_price(price)
+                var ty = yy - 6
+                if i == 0:
+                    ty = yy + 1
+                if i == divisions:
+                    ty = yy - 12
+                _ = ctx.draw_text(label, self.plot_right() + 4, ty, 10)
 
         # ----- Time labels along the bottom gutter -------------------------
         var n = self.data.len()
