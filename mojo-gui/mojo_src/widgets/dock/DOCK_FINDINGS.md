@@ -12,7 +12,14 @@ may drift — anchor on the function name.
 
 ---
 
-## 1. BLOCKER — `create_dock_area_int` arity vs. demo call site (does not compile)
+## 1. BLOCKER — `create_dock_area_int` arity vs. demo call site (RESOLVED)
+
+> **RESOLVED** (re-verified on disk): the original report was from a stale
+> snapshot during concurrent editing. Current `dock_demo.mojo:114-115` uses the
+> 4-arg factory + `area.set_state(state^)`, and `area.mojo:719`
+> `create_dock_area_int(x,y,width,height)` matches `__init__`.
+> `pixi run mojo build mojo-gui/dock_demo.mojo` → **EXIT 0**. Original report
+> retained below for the record.
 
 - **Mojo:** `area.mojo:703` `fn create_dock_area_int(x, y, width, height) -> DockAreaInt` (4 args, builds an EMPTY state); `area.mojo:119` `DockAreaInt.__init__(out self, x, y, width, height)`.
 - **Caller:** `dock_demo.mojo:114` `var area = create_dock_area_int(DOCK_X, DOCK_Y, DOCK_W, DOCK_H, state^)` — passes a 5th `state^` arg and never calls `area.set_state(state^)`.
@@ -26,7 +33,12 @@ may drift — anchor on the function name.
 
 ---
 
-## 2. CORRECTNESS — drop commit re-finds target using STALE rects after `remove_tab`
+## 2. CORRECTNESS — drop commit re-finds target using STALE rects after `remove_tab` (RESOLVED)
+
+> **RESOLVED** (re-verified on disk): `area.mojo:_commit_drop` now calls
+> `self.layout()` immediately after `remove_tab(src_node, src_tab)` (area.mojo:581+)
+> and before `new_target = self._leaf_at(px, py)`, so the re-find hit-tests
+> fresh post-collapse rects. Original report retained below.
 
 - **Mojo:** `area.mojo:_commit_drop` (~:564–591). Sequence: `remove_tab(src_node, src_tab)` → `new_target = self._leaf_at(px, py)` → split/append on `new_target` → `self.layout()` (only at the end).
 - **Rust ref:** `tree/mod.rs` `remove_tab`→`remove_leaf` (sibling pull-up at :612) mutates node positions; egui recomputes all rects each immediate-mode frame before any hit-test, so it never hit-tests against stale geometry.

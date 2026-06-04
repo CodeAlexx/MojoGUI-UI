@@ -46,7 +46,7 @@ Audited by the skeptic agent (read-only). Findings with file:line are in
 | `allowed_splits.rs` (`AllowedSplits`) | — | **STUBBED** | No `AllowedSplits` type; all four splits always allowed. |
 | `tab_removal.rs` (`TabRemoval`) | inline `remove_tab` on click | **PARTIAL** | Close button removes immediately; no deferred `to_remove` queue, no `force_close`. |
 | `state.rs` (`State`: hover_pos, drag/drop state) | inline fields on `DockAreaInt` | **PARTIAL** | Drag/press/hover tracked as flat fields; faithful enough for phase-1. |
-| `mod.rs` (`DockArea` builder + option flags) | `DockAreaInt` + `create_dock_area_int` | **PARTIAL** | Bounds/state/style + handle_mouse_event/render. Builder option flags (`draggable_tabs`, `show_close_buttons`, `tab_context_menus`, `show_add_*`, `allowed_splits`, `window_bounds`, secondary-button, …) DEFERRED. **Constructor/demo contract is currently BROKEN — see findings #1.** |
+| `mod.rs` (`DockArea` builder + option flags) | `DockAreaInt` + `create_dock_area_int` | **PARTIAL** | Bounds/state/style + handle_mouse_event/render. Builder option flags (`draggable_tabs`, `show_close_buttons`, `tab_context_menus`, `show_add_*`, `allowed_splits`, `window_bounds`, secondary-button, …) DEFERRED. Constructor/demo contract now correct (4-arg factory + `set_state`); compiles EXIT 0 — see findings #1 (resolved). |
 | `tab_viewer.rs` (`TabViewer` trait) | host content-rect API (`leaf_count`/`visible_leaf_index`/`leaf_body_rect`/`leaf_active_tab_id`) | **PORTED (adapted)** | Immediate-mode `TabViewer::ui` → retained content-rect callback. `leaf_body_rect` correctly excludes the tab strip. Sufficient for a host to draw content; `title/closeable/on_close/context_menu/clear_background` etc. NOT exposed. |
 
 ### `style.rs` → `style.mojo`
@@ -80,9 +80,11 @@ add-popups, collapse, scroll, i18n, tab-type remap).
   Most of the crate is the deferred surfaces/windows/overlay/buttons/i18n
   machinery that phase-1 deliberately excludes.
 
-## Blocking issue
+## Blocking issue — RESOLVED
 
-`dock_demo.mojo` does **not compile** as of this audit: `create_dock_area_int`
-takes 4 args (empty state) but the demo calls it with 5 (`state^`) and never
-calls `set_state`. See `DOCK_FINDINGS.md` #1. Definition-of-done (EXIT 0) is
-currently unmet.
+The earlier compile blocker (audit snapshot) is **fixed and re-verified**:
+`dock_demo.mojo:114-115` uses the 4-arg `create_dock_area_int(...)` +
+`area.set_state(state^)`. `pixi run mojo build mojo-gui/dock_demo.mojo` →
+**EXIT 0** (0 errors / 0 warnings / 0 libm-undef). The drop-commit stale-rect
+correctness bug (findings #2) is also fixed (`layout()` after `remove_tab`).
+Definition-of-done (EXIT 0) is **met**. See `DOCK_FINDINGS.md` #1, #2.
